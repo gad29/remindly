@@ -3,13 +3,29 @@
 
 // Custom variables
 :root {
-  --remindly-primary: #1976d2;
-  --remindly-secondary: #424242;
-  --remindly-accent: #82b1ff;
-  --remindly-error: #ff5252;
-  --remindly-info: #2196f3;
-  --remindly-success: #4caf50;
-  --remindly-warning: #ffc107;
+  --primary: #176b78;
+  --primary-hover: #115a65;
+  --primary-soft: #dceff0;
+  --accent: #ffb38a;
+  --success: #2e8b6d;
+  --danger: #c5484d;
+  --warning: #b77712;
+  --ink: #132a3a;
+  --ink-muted: #526773;
+  --ink-soft: #7c8d96;
+  --surface: #ffffff;
+  --surface-soft: #f3f7f7;
+  --line: #dce5e7;
+  --font-display: "Segoe UI Variable Display", "Aptos Display", "Segoe UI", sans-serif;
+  --font-body: "Segoe UI Variable Text", "Aptos", "Segoe UI", sans-serif;
+  --font-utility: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --remindly-primary: var(--primary);
+  --remindly-secondary: var(--ink-muted);
+  --remindly-accent: var(--accent);
+  --remindly-error: var(--danger);
+  --remindly-info: #347ba3;
+  --remindly-success: var(--success);
+  --remindly-warning: var(--warning);
   
   // Spacing
   --spacing-xs: 4px;
@@ -20,16 +36,16 @@
   --spacing-xxl: 48px;
   
   // Border radius
-  --border-radius-sm: 4px;
-  --border-radius-md: 8px;
-  --border-radius-lg: 12px;
-  --border-radius-xl: 16px;
+  --border-radius-sm: 6px;
+  --border-radius-md: 10px;
+  --border-radius-lg: 14px;
+  --border-radius-xl: 20px;
   
   // Shadows
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
-  --shadow-md: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
-  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
-  --shadow-xl: 0 14px 28px rgba(0, 0, 0, 0.25), 0 10px 10px rgba(0, 0, 0, 0.22);
+  --shadow-sm: 0 1px 2px rgba(19, 42, 58, .06);
+  --shadow-md: 0 8px 24px rgba(19, 42, 58, .08);
+  --shadow-lg: 0 18px 50px rgba(19, 42, 58, .12);
+  --shadow-xl: 0 28px 70px rgba(19, 42, 58, .16);
 }
 
 // RTL Support
@@ -82,24 +98,46 @@
 html {
   font-size: 16px;
   line-height: 1.5;
+  background: var(--surface-soft);
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
+  color: var(--ink);
+  background-color: var(--surface-soft);
 }
+
+button, input, textarea, select { font: inherit; }
+button, a { touch-action: manipulation; }
+:focus-visible { outline: 3px solid rgba(23, 107, 120, .32); outline-offset: 3px; }
+::selection { color: var(--ink); background: var(--accent); }
 
 // App specific styles
 .remindly-app {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100dvh;
+  color: var(--ink);
+  background: var(--surface-soft);
   
   .v-application {
     background: transparent;
+  }
+}
+
+.v-btn { letter-spacing: 0 !important; text-transform: none !important; }
+.v-card { color: var(--ink); }
+.v-field { border-radius: 12px !important; }
+.v-overlay__scrim { opacity: .52 !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
   }
 }
 

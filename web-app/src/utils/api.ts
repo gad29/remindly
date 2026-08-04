@@ -1,10 +1,15 @@
 import axios from 'axios'
 import type { ApiResponse } from '@/types'
 
-// Create axios instance
+const configuredApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL
+const isLocalDevelopment = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+const apiBaseUrl = configuredApiUrl || (isLocalDevelopment ? 'http://localhost:3001/api' : '/api')
+
+// Use the same origin in production. This is required for the web, Electron and
+// Capacitor clients, all of which load the application from the hosted domain.
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
-  timeout: 10000,
+  baseURL: apiBaseUrl,
+  timeout: 20000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -329,4 +334,5 @@ const apiService = {
 }
 
 export { api, apiService }
+export { apiBaseUrl }
 export default api

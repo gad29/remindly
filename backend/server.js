@@ -41,6 +41,11 @@ import { logger } from "./utils/logger.js";
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// CloudPanel/Nginx is the single public reverse proxy in production. This lets
+// rate limiting identify the real client instead of treating every login as
+// if it came from the proxy itself.
+if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
+
 // Security middleware
 app.use(
   helmet({
@@ -182,16 +187,8 @@ prepareDatabase
       code: err.code,
       sql: err.sql
     });
-    logger.warn("Continuing without database synchronization...");
-    logger.warn("⚠️  Data will NOT be saved to database!");
-    // Start server anyway
-    const server = app.listen(PORT, () => {
-      logger.info(`🚀 Server running on port ${PORT}`);
-      logger.info(`📱 Environment: ${process.env.NODE_ENV || "development"}`);
-      logger.info(`🔗 API URL: http://localhost:${PORT}/api`);
-      logger.info(`❤️  Health check: http://localhost:${PORT}/health`);
-      logger.warn("⚠️  Database not synchronized - data will NOT be saved!");
-    });
+    logger.error("The API will not start without its database. PM2 can retry after the database recovers.");
+    process.exitCode = 1;
   });
 
 // Graceful shutdown

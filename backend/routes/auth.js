@@ -400,4 +400,45 @@ router.put(
   }
 );
 
+// @desc    Update user settings
+// @route   PUT /api/auth/settings
+// @access  Private
+router.put("/settings", protect, async (req, res) => {
+  try {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      return res.status(400).json({ success: false, error: "Settings must be an object" });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+
+    const allowedKeys = ["notifications", "reminders", "voice", "ai"];
+    const acceptedSettings = Object.fromEntries(
+      Object.entries(req.body).filter(([key]) => allowedKeys.includes(key))
+    );
+    const settings = { ...(user.settings || {}), ...acceptedSettings };
+    await user.update({ settings });
+
+    res.json({ success: true, settings });
+  } catch (error) {
+    console.error("Update settings error:", error);
+    res.status(500).json({ success: false, error: "Server error while updating settings" });
+  }
+});
+
+// @desc    Permanently delete the signed-in account
+// @route   DELETE /api/auth/account
+// @access  Private
+router.delete("/account", protect, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+    await user.destroy();
+    res.json({ success: true, message: "Account deleted" });
+  } catch (error) {
+    console.error("Delete account error:", error);
+    res.status(500).json({ success: false, error: "Server error while deleting account" });
+  }
+});
+
 export default router;

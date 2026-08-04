@@ -1,391 +1,96 @@
 <template>
-  <div class="register-view">
-    <v-container fluid class="fill-height">
-      <v-row align="center" justify="center" class="fill-height">
-        <v-col cols="12" sm="8" md="6" lg="4" xl="3">
-          <v-card class="remindly-card register-card" elevation="8">
-            <v-card-text class="pa-8">
-              <!-- Logo and Title -->
-              <div class="text-center mb-8">
-                <v-icon size="64" color="primary" class="mb-4">mdi-bell-outline</v-icon>
-                <h1 class="text-h4 font-weight-bold mb-2">{{ $t('auth.createNewAccount') }}</h1>
-                <p class="text-body-1 text-medium-emphasis">{{ $t('app.description') }}</p>
-              </div>
+  <main class="register-page" dir="ltr">
+    <RouterLink to="/login" class="register-brand"><span class="brand-symbol"><v-icon>mdi-bell-check-outline</v-icon></span><span>remindly</span></RouterLink>
+    <section class="register-card" aria-labelledby="register-title">
+      <header>
+        <p class="eyebrow">Start with one thought</p>
+        <h1 id="register-title">Create your account</h1>
+        <p>One account keeps your reminders, lists and server routines together.</p>
+      </header>
 
-              <!-- Register Form -->
-              <v-form ref="registerForm" v-model="formValid" @submit.prevent="handleRegister">
-                <v-text-field v-model="registerData.name" :label="$t('common.name')"
-                  :rules="[rules.required, rules.minLength(2)]" prepend-inner-icon="mdi-account" variant="outlined"
-                  class="mb-4" required />
+      <v-alert v-if="errorMessage" type="error" variant="tonal" class="mb-5" closable
+        @click:close="errorMessage = ''" role="alert">{{ errorMessage }}</v-alert>
 
-                <v-text-field v-model="registerData.email" :label="$t('auth.email')" type="email"
-                  :rules="[rules.required, rules.email]" prepend-inner-icon="mdi-email" variant="outlined" class="mb-4"
-                  required />
+      <v-form ref="registerForm" v-model="formValid" @submit.prevent="handleRegister">
+        <label class="field-label" for="register-name">Your name</label>
+        <v-text-field id="register-name" v-model.trim="form.name" autocomplete="name" placeholder="How should we address you?"
+          :rules="[rules.required, rules.name]" variant="outlined" prepend-inner-icon="mdi-account-outline" class="auth-field" />
 
-                <v-text-field v-model="registerData.password" :label="$t('auth.password')"
-                  :type="showPassword ? 'text' : 'password'" :rules="[rules.required, rules.minLength(6)]"
-                  prepend-inner-icon="mdi-lock" :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
-                  @click:append-inner="showPassword = !showPassword" variant="outlined" class="mb-4" required />
+        <label class="field-label" for="register-email">Email address</label>
+        <v-text-field id="register-email" v-model.trim="form.email" type="email" autocomplete="email" placeholder="you@example.com"
+          :rules="[rules.required, rules.email]" variant="outlined" prepend-inner-icon="mdi-email-outline" class="auth-field" />
 
-                <v-text-field v-model="registerData.confirmPassword" :label="$t('auth.confirmPassword')"
-                  :type="showConfirmPassword ? 'text' : 'password'" :rules="[rules.required, rules.confirmPassword]"
-                  prepend-inner-icon="mdi-lock-check"
-                  :append-inner-icon="showConfirmPassword ? 'mdi-eye' : 'mdi-eye-off'"
-                  @click:append-inner="showConfirmPassword = !showConfirmPassword" variant="outlined" class="mb-4"
-                  required />
-
-                <!-- Language Selection -->
-                <v-select v-model="registerData.language" :items="languageOptions" :item-title="'text'"
-                  :item-value="'value'" :label="$t('settings.language')" prepend-inner-icon="mdi-translate"
-                  variant="outlined" class="mb-4" />
-
-                <!-- Terms and Conditions -->
-                <v-checkbox v-model="acceptTerms" :rules="[rules.required]" color="primary" class="mb-4">
-                  <template v-slot:label>
-                    <span class="text-body-2">
-                      אני מסכים ל
-                      <a href="#" @click.prevent="showTerms = true" class="text-primary">
-                        תנאי השימוש
-                      </a>
-                      ו
-                      <a href="#" @click.prevent="showPrivacy = true" class="text-primary">
-                        מדיניות הפרטיות
-                      </a>
-                    </span>
-                  </template>
-                </v-checkbox>
-
-                <v-btn type="submit" color="primary" size="large" block :loading="loading"
-                  :disabled="!formValid || !acceptTerms" class="mb-4">
-                  {{ $t('auth.register') }}
-                </v-btn>
-
-                <!-- Social Register -->
-                <v-divider class="my-4">
-                  <span class="text-body-2 text-medium-emphasis px-4">או</span>
-                </v-divider>
-
-                <v-btn color="white" variant="outlined" size="large" block class="mb-4" @click="registerWithGoogle">
-                  <v-icon class="mr-2">mdi-google</v-icon>
-                  {{ $t('auth.register') }} עם Google
-                </v-btn>
-
-                <v-btn color="primary" variant="outlined" size="large" block @click="registerWithFacebook">
-                  <v-icon class="mr-2">mdi-facebook</v-icon>
-                  {{ $t('auth.register') }} עם Facebook
-                </v-btn>
-              </v-form>
-
-              <!-- Login Link -->
-              <div class="text-center mt-6">
-                <span class="text-body-2 text-medium-emphasis">
-                  {{ $t('auth.alreadyHaveAccount') }}
-                </span>
-                <v-btn variant="text" color="primary" @click="$router.push('/login')">
-                  {{ $t('auth.login') }}
-                </v-btn>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-    </v-container>
-
-    <!-- Terms and Conditions Dialog -->
-    <v-dialog v-model="showTerms" max-width="600">
-      <v-card>
-        <v-card-title>
-          <span class="text-h5">תנאי השימוש</span>
-        </v-card-title>
-        <v-card-text>
-          <div class="text-body-1">
-            <h3 class="text-h6 mb-3">1. קבלת השירות</h3>
-            <p class="mb-4">
-              על ידי שימוש באפליקציית Remindly, אתה מסכים לתנאים אלו. אם אינך מסכים לתנאים אלו, אנא אל תשתמש באפליקציה.
-            </p>
-
-            <h3 class="text-h6 mb-3">2. שימוש באפליקציה</h3>
-            <p class="mb-4">
-              אתה רשאי להשתמש באפליקציה למטרות אישיות בלבד. אסור לך להשתמש באפליקציה למטרות מסחריות ללא אישור מפורש.
-            </p>
-
-            <h3 class="text-h6 mb-3">3. פרטיות</h3>
-            <p class="mb-4">
-              אנו מכבדים את הפרטיות שלך ומתחייבים להגן על המידע האישי שלך בהתאם למדיניות הפרטיות שלנו.
-            </p>
-
-            <h3 class="text-h6 mb-3">4. אחריות</h3>
-            <p class="mb-4">
-              האפליקציה מסופקת "כפי שהיא" ללא כל אחריות. אנו לא נושאים באחריות לכל נזק שעלול להיגרם כתוצאה משימוש
-              באפליקציה.
-            </p>
+        <div class="form-grid">
+          <div>
+            <label class="field-label" for="register-password">Password</label>
+            <v-text-field id="register-password" v-model="form.password" :type="showPassword ? 'text' : 'password'"
+              autocomplete="new-password" :rules="[rules.required, rules.password]" variant="outlined"
+              :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+              @click:append-inner="showPassword = !showPassword" class="auth-field" />
           </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn color="primary" @click="showTerms = false">
-            {{ $t('common.close') }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Privacy Policy Dialog -->
-    <v-dialog v-model="showPrivacy" max-width="600">
-      <v-card>
-        <v-card-title>
-          <span class="text-h5">מדיניות הפרטיות</span>
-        </v-card-title>
-        <v-card-text>
-          <div class="text-body-1">
-            <h3 class="text-h6 mb-3">איסוף מידע</h3>
-            <p class="mb-4">
-              אנו אוספים מידע שאתה מספק לנו ישירות, כגון שם, כתובת אימייל ומידע אחר שאתה בוחר לשתף.
-            </p>
-
-            <h3 class="text-h6 mb-3">שימוש במידע</h3>
-            <p class="mb-4">
-              אנו משתמשים במידע שאספנו כדי לספק לך את השירותים שלנו, לשפר את האפליקציה ולתקשר איתך.
-            </p>
-
-            <h3 class="text-h6 mb-3">שיתוף מידע</h3>
-            <p class="mb-4">
-              אנו לא מוכרים, לא משכירים ולא חושפים את המידע האישי שלך לצדדים שלישיים ללא הסכמתך המפורשת.
-            </p>
-
-            <h3 class="text-h6 mb-3">אבטחת מידע</h3>
-            <p class="mb-4">
-              אנו נוקטים באמצעי אבטחה מתאימים כדי להגן על המידע האישי שלך מפני גישה לא מורשית, שימוש, שינוי או חשיפה.
-            </p>
+          <div>
+            <label class="field-label" for="register-confirm">Confirm password</label>
+            <v-text-field id="register-confirm" v-model="form.confirmPassword" :type="showPassword ? 'text' : 'password'"
+              autocomplete="new-password" :rules="[rules.required, rules.confirm]" variant="outlined" class="auth-field" />
           </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn color="primary" @click="showPrivacy = false">
-            {{ $t('common.close') }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        </div>
 
-    <!-- Error Snackbar -->
-    <v-snackbar v-model="showError" color="error" timeout="5000" location="top">
-      {{ errorMessage }}
-      <template v-slot:actions>
-        <v-btn color="white" variant="text" @click="showError = false">
-          {{ $t('common.close') }}
-        </v-btn>
-      </template>
-    </v-snackbar>
+        <label class="field-label" for="register-language">Preferred language</label>
+        <v-select id="register-language" v-model="form.language" :items="languages" item-title="title" item-value="value"
+          variant="outlined" prepend-inner-icon="mdi-translate" class="auth-field" />
 
-    <!-- Success Snackbar -->
-    <v-snackbar v-model="showSuccess" color="success" timeout="3000" location="top">
-      {{ successMessage }}
-      <template v-slot:actions>
-        <v-btn color="white" variant="text" @click="showSuccess = false">
-          {{ $t('common.close') }}
-        </v-btn>
-      </template>
-    </v-snackbar>
-  </div>
+        <v-checkbox v-model="acceptTerms" color="primary" hide-details class="terms-check">
+          <template #label><span>I agree to use Remindly responsibly and keep my account credentials private.</span></template>
+        </v-checkbox>
+
+        <v-btn type="submit" color="primary" size="x-large" block :loading="userStore.loading"
+          :disabled="!formValid || !acceptTerms || userStore.loading" class="auth-submit">Create account</v-btn>
+      </v-form>
+
+      <p class="auth-switch">Already have an account? <RouterLink to="/login">Sign in</RouterLink></p>
+    </section>
+    <aside class="register-note"><v-icon>mdi-microphone-outline</v-icon><span><strong>Voice-first, confirmation-always.</strong>Your assistant previews every change before applying it.</span></aside>
+  </main>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 
 const router = useRouter()
 const userStore = useUserStore()
-
-// Reactive data
 const registerForm = ref()
 const formValid = ref(false)
-const showPassword = ref(false)
-const showConfirmPassword = ref(false)
 const acceptTerms = ref(false)
-const showTerms = ref(false)
-const showPrivacy = ref(false)
-const showError = ref(false)
-const showSuccess = ref(false)
+const showPassword = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
-
-const registerData = ref({
-  name: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  language: 'he'
-})
-
-// Language options
-const languageOptions = [
-  { text: 'עברית', value: 'he' },
-  { text: 'English', value: 'en' }
-]
-
-// Computed properties
-const loading = computed(() => userStore.loading)
-
-// Validation rules
+const form = ref({ name: '', email: '', password: '', confirmPassword: '', language: 'en' as 'he' | 'en' })
+const languages = [{ title: 'English', value: 'en' }, { title: 'עברית', value: 'he' }]
 const rules = {
-  required: (value: any) => !!value || 'שדה חובה',
-  email: (value: string) => {
-    const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return pattern.test(value) || 'כתובת אימייל לא תקינה'
-  },
-  minLength: (min: number) => (value: string) =>
-    (value && value.length >= min) || `מינימום ${min} תווים`,
-  confirmPassword: (value: string) =>
-    value === registerData.value.password || 'הסיסמאות לא תואמות'
+  required: (value: string) => Boolean(value) || 'This field is required',
+  name: (value: string) => value.length >= 2 || 'Use at least 2 characters',
+  email: (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || 'Enter a valid email address',
+  password: (value: string) => value.length >= 8 || 'Use at least 8 characters',
+  confirm: (value: string) => value === form.value.password || 'Passwords do not match'
 }
 
-// Methods
 const handleRegister = async () => {
-  if (formValid.value && acceptTerms.value) {
-    const result = await userStore.register({
-      name: registerData.value.name,
-      email: registerData.value.email,
-      password: registerData.value.password,
-      language: registerData.value.language
-    })
-
-    if (result.success) {
-      successMessage.value = 'נרשמת בהצלחה!'
-      showSuccess.value = true
-
-      // Wait a bit for the success message to show, then redirect
-      setTimeout(() => {
-        router.push('/')
-      }, 1000)
-    } else {
-      errorMessage.value = result.error || 'שגיאה בהרשמה'
-      showError.value = true
-    }
-  }
-}
-
-const registerWithGoogle = async () => {
-  // Implement Google OAuth
-  console.log('Register with Google')
-  errorMessage.value = 'הרשמה עם Google תגיע בקרוב'
-  showError.value = true
-}
-
-const registerWithFacebook = async () => {
-  // Implement Facebook OAuth
-  console.log('Register with Facebook')
-  errorMessage.value = 'הרשמה עם Facebook תגיע בקרוב'
-  showError.value = true
+  const validation = await registerForm.value?.validate()
+  if (!validation?.valid || !acceptTerms.value) return
+  errorMessage.value = ''
+  const result = await userStore.register({ name: form.value.name, email: form.value.email, password: form.value.password, language: form.value.language })
+  if (result.success) await router.replace('/')
+  else errorMessage.value = result.error || 'Registration failed. Please try again.'
 }
 </script>
 
 <style scoped>
-.register-view {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  position: relative;
-}
-
-.register-view::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="10" cy="60" r="0.5" fill="white" opacity="0.1"/><circle cx="90" cy="40" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-  opacity: 0.3;
-}
-
-.register-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.v-card {
-  position: relative;
-  z-index: 1;
-}
-
-/* Animation for form elements */
-.v-text-field {
-  transition: all 0.3s ease;
-}
-
-.v-text-field:focus-within {
-  transform: translateY(-2px);
-}
-
-.v-btn {
-  transition: all 0.3s ease;
-}
-
-.v-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* RTL Support */
-[dir="rtl"] .v-text-field .v-field__input {
-  text-align: right;
-}
-
-[dir="rtl"] .v-text-field .v-label {
-  text-align: right;
-}
-
-/* Responsive design */
-@media (max-width: 600px) {
-  .register-card {
-    margin: 16px;
-  }
-
-  .register-card .v-card-text {
-    padding: 24px;
-  }
-}
-
-/* Loading animation */
-.v-btn--loading .v-btn__content {
-  opacity: 0;
-}
-
-.v-btn--loading .v-progress-circular {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-/* Custom focus styles */
-.v-text-field:focus-within .v-field__outline {
-  color: rgb(var(--v-theme-primary));
-}
-
-/* Error state styling */
-.v-text-field--error .v-field__outline {
-  color: rgb(var(--v-theme-error));
-}
-
-/* Success state styling */
-.v-text-field--success .v-field__outline {
-  color: rgb(var(--v-theme-success));
-}
-
-/* Terms and conditions styling */
-.v-checkbox .v-label {
-  line-height: 1.4;
-}
-
-.v-checkbox .v-label a {
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.v-checkbox .v-label a:hover {
-  text-decoration: underline;
-}
+.register-page{min-height:100dvh;display:grid;grid-template-columns:minmax(0,760px) minmax(260px,360px);align-content:center;justify-content:center;gap:40px;padding:80px 32px;background:radial-gradient(circle at 12% 14%,#dceef0 0,transparent 30%),var(--surface-soft)}
+.register-brand{position:absolute;top:28px;left:32px;display:flex;align-items:center;gap:10px;color:var(--ink);font:700 1.2rem var(--font-display);text-decoration:none}.brand-symbol{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;color:#132a3a;background:var(--accent)}
+.register-card{padding:clamp(28px,5vw,58px);border:1px solid var(--line);border-radius:28px;background:var(--surface);box-shadow:var(--shadow-lg)}
+.register-card header{margin-bottom:30px}.eyebrow{margin:0 0 12px;color:var(--primary);font:700 .76rem var(--font-utility);letter-spacing:.15em;text-transform:uppercase}.register-card h1{margin:0;color:var(--ink);font:650 clamp(2.4rem,5vw,4rem)/1 var(--font-display);letter-spacing:-.05em}.register-card header p:last-child{color:var(--ink-muted)}
+.field-label{display:block;margin:0 0 8px;color:var(--ink);font-weight:650;font-size:.88rem}.auth-field{margin-bottom:7px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.terms-check{margin:2px 0 18px}.terms-check span{color:var(--ink-muted);font-size:.84rem;line-height:1.45}.auth-submit{height:54px!important;border-radius:14px!important;font-weight:700;text-transform:none;letter-spacing:0}.auth-switch{text-align:center;margin:26px 0 0;color:var(--ink-muted)}.auth-switch a{color:var(--primary);font-weight:700;text-decoration:none}
+.register-note{align-self:end;display:flex;gap:16px;padding:24px;border-radius:22px;color:#dce8ed;background:#132a3a}.register-note .v-icon{flex:0 0 auto;color:var(--accent)}.register-note span,.register-note strong{display:block}.register-note span{font-size:.88rem;line-height:1.55}.register-note strong{margin-bottom:5px;color:#fff}
+@media(max-width:900px){.register-page{grid-template-columns:minmax(0,680px);padding:92px 18px 48px}.register-note{display:none}.form-grid{grid-template-columns:1fr}.register-brand{left:22px}}
 </style>

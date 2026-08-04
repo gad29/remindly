@@ -11,26 +11,21 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       },
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['LogoRemindly.png'],
       manifest: {
         name: 'Remindly',
         short_name: 'Remindly',
         description: 'Smart Task Management App',
-        theme_color: '#1976d2',
-        background_color: '#ffffff',
+        theme_color: '#176b78',
+        background_color: '#f3f7f7',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',
         start_url: '/',
         icons: [
           {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
+            src: 'LogoRemindly.png',
+            sizes: '1024x1024',
             type: 'image/png'
           }
         ]

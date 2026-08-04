@@ -1,634 +1,120 @@
 <template>
-  <div class="home-view">
-    <!-- Only show content if user is authenticated -->
-    <div v-if="userStore.isAuthenticated">
-      <!-- Header Section -->
-      <div class="header-section">
-        <div class="header-content">
-          <div class="app-title-container">
-            <img src="/LogoRemindly.png" alt="Remindly Logo" class="app-logo" />
-            <h1 class="app-title">REMINDLY</h1>
+  <div class="today-page">
+    <header class="today-hero">
+      <div>
+        <p class="eyebrow">{{ greeting }}</p>
+        <h1>What deserves your attention?</h1>
+        <p class="hero-copy">A calm view of what is due, what can wait, and what you have already moved forward.</p>
+      </div>
+      <div class="hero-actions">
+        <v-btn color="primary" size="large" prepend-icon="mdi-waveform" @click="router.push('/assistant')">Speak a reminder</v-btn>
+        <v-btn variant="outlined" size="large" prepend-icon="mdi-format-list-bulleted" @click="router.push('/lists/new')">New list</v-btn>
+      </div>
+    </header>
+
+    <section class="dayline" aria-label="Today at a glance">
+      <div class="dayline-track"><span class="dayline-progress" :style="{ width: `${dayProgress}%` }"></span><i :style="{ left: `${dayProgress}%` }"></i></div>
+      <div class="dayline-labels"><span>Morning</span><strong>{{ currentTime }}</strong><span>Evening</span></div>
+    </section>
+
+    <section class="metric-grid" aria-label="Task overview">
+      <article><span class="metric-icon metric-icon--today"><v-icon>mdi-white-balance-sunny</v-icon></span><div><strong>{{ taskStore.todayTasks.length }}</strong><small>Due today</small></div></article>
+      <article><span class="metric-icon metric-icon--pending"><v-icon>mdi-timer-sand</v-icon></span><div><strong>{{ taskStore.pendingTasks.length }}</strong><small>Open tasks</small></div></article>
+      <article><span class="metric-icon metric-icon--overdue"><v-icon>mdi-alert-circle-outline</v-icon></span><div><strong>{{ taskStore.overdueTasks.length }}</strong><small>Need attention</small></div></article>
+      <article><span class="metric-icon metric-icon--done"><v-icon>mdi-check</v-icon></span><div><strong>{{ completionRate }}%</strong><small>Completed</small></div></article>
+    </section>
+
+    <div class="dashboard-grid">
+      <section class="focus-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">Next up</p><h2>Your focus list</h2></div>
+          <v-btn variant="text" color="primary" append-icon="mdi-arrow-right" @click="router.push('/tasks')">All tasks</v-btn>
+        </div>
+
+        <div v-if="taskStore.loading" class="task-skeleton" aria-label="Loading tasks"><span v-for="n in 4" :key="n"></span></div>
+        <div v-else-if="focusTasks.length" class="focus-list">
+          <article v-for="task in focusTasks" :key="task.id" class="focus-task">
+            <button type="button" class="task-check" :aria-label="`Complete ${task.title}`" @click="taskStore.toggleTaskCompletion(task.id)"><v-icon>mdi-check</v-icon></button>
+            <div class="task-copy"><strong>{{ task.title }}</strong><span><v-icon size="15">mdi-clock-outline</v-icon>{{ formatTaskTime(task) }}<em :class="`priority-${task.priority}`">{{ task.priority }}</em></span></div>
+            <v-btn icon="mdi-chevron-right" variant="text" size="small" :aria-label="`Open ${task.title}`" @click="openTask(task)" />
+          </article>
+        </div>
+        <div v-else class="empty-focus">
+          <span><v-icon>mdi-weather-sunset</v-icon></span>
+          <h3>Your focus list is clear</h3>
+          <p>Capture the next thing before it has to stay in your head.</p>
+          <v-btn color="primary" variant="tonal" prepend-icon="mdi-waveform" @click="router.push('/assistant')">Capture by voice</v-btn>
+        </div>
+      </section>
+
+      <aside class="side-stack">
+        <section class="progress-panel">
+          <div class="progress-ring" :style="{ '--progress': `${completionRate * 3.6}deg` }"><span><strong>{{ taskStore.completedTasks.length }}</strong><small>done</small></span></div>
+          <div><p class="eyebrow">Momentum</p><h2>Small wins count.</h2><p>{{ momentumMessage }}</p></div>
+        </section>
+
+        <section class="collections-panel">
+          <div class="section-heading"><div><p class="eyebrow">Spaces</p><h2>Collections</h2></div><v-btn icon="mdi-plus" variant="tonal" size="small" aria-label="Create list" @click="router.push('/lists/new')" /></div>
+          <div class="collection-grid">
+            <button v-for="collection in collections" :key="collection.to" type="button" @click="router.push(collection.to)">
+              <span :style="{ background: collection.tint, color: collection.color }"><v-icon>{{ collection.icon }}</v-icon></span>
+              <strong>{{ collection.title }}</strong><small>{{ collection.caption }}</small>
+            </button>
           </div>
-          <p class="app-subtitle">ORGANIZE. REMEMBER. ACHIEVE</p>
-        </div>
-      </div>
-
-      <!-- Main Cards Grid -->
-      <v-container fluid class="pa-4">
-        <v-row>
-          <!-- Shopping Lists Card -->
-          <v-col cols="12" sm="6" class="mb-4">
-            <v-card class="category-card shopping-card" elevation="4" @click="navigateToShoppingLists">
-              <v-card-text class="pa-6">
-                <div class="card-content">
-                  <v-icon size="48" color="white" class="mb-3">mdi-cart-outline</v-icon>
-                  <h3 class="card-title">Shopping Lists</h3>
-                  <p class="card-description">Milk, Eggs, Bread... Grocery Store</p>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-
-          <!-- Appointments Card -->
-          <v-col cols="12" sm="6" class="mb-4">
-            <v-card class="category-card appointments-card" elevation="4" @click="navigateToAppointmentLists">
-              <v-card-text class="pa-6">
-                <div class="card-content">
-                  <v-icon size="48" color="white" class="mb-3">mdi-calendar</v-icon>
-                  <h3 class="card-title">Appointments</h3>
-                  <p class="card-description">Dentist (Mon, 10 AM), Meeting...</p>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-
-          <!-- TO-DOs Card -->
-          <v-col cols="12" sm="6" class="mb-4">
-            <v-card class="category-card todos-card" elevation="4" @click="navigateToTasksLists">
-              <v-card-text class="pa-6">
-                <div class="card-content">
-                  <v-icon size="48" color="white" class="mb-3">mdi-checkbox-marked-circle-outline</v-icon>
-                  <h3 class="card-title">TO-DOs</h3>
-                  <p class="card-description">Finish Project X, Call Ban</p>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-
-          <!-- IDEAS Card -->
-          <v-col cols="12" sm="6" class="mb-4">
-            <v-card class="category-card ideas-card" elevation="4" @click="navigateToIdeasLists">
-              <v-card-text class="pa-6">
-                <div class="card-content">
-                  <v-icon size="48" color="white" class="mb-3">mdi-lightbulb-outline</v-icon>
-                  <h3 class="card-title">IDEAS</h3>
-                  <p class="card-description">New App Features, Travel Ideas</p>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-
-          <!-- VOICE MEMOS Card -->
-          <v-col cols="12" sm="6" class="mb-4">
-            <v-card class="category-card voice-card" elevation="4" @click="navigateToVoice">
-              <v-card-text class="pa-6">
-                <div class="card-content">
-                  <v-icon size="48" color="white" class="mb-3">mdi-microphone</v-icon>
-                  <h3 class="card-title">VOICE MEMOS</h3>
-                  <p class="card-description">Quick Thoughts, Audio Notes</p>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-
-          <!-- MEDIA GALLERY Card -->
-          <v-col cols="12" sm="6" class="mb-4">
-            <v-card class="category-card media-card" elevation="4" @click="navigateToMediaGallery">
-              <v-card-text class="pa-6">
-                <div class="card-content">
-                  <v-icon size="48" color="white" class="mb-3">mdi-photo-library</v-icon>
-                  <h3 class="card-title">MEDIA GALLERY</h3>
-                  <p class="card-description">Photos & Videos, Capture & Share</p>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-
-      </v-container>
-
-      <!-- Footer with Add Button -->
-      <div class="footer-section">
-        <div class="footer-content">
-          <v-btn
-            class="add-button"
-            color="primary"
-            size="large"
-            rounded
-            elevation="8"
-            @click="showAddTaskDialog = true"
-          >
-            <v-icon start>mdi-plus</v-icon>
-            Add New Item
-          </v-btn>
-        </div>
-      </div>
+        </section>
+      </aside>
     </div>
-
-    <!-- Show login message if not authenticated -->
-    <div v-else class="login-message">
-      <div class="login-content">
-        <v-icon size="80" color="white" class="mb-4">mdi-bell-outline</v-icon>
-        <h1 class="login-title">ברוכים הבאים ל-REMINDLY</h1>
-        <p class="login-subtitle">התחברו כדי להתחיל לנהל את המשימות שלכם</p>
-        <v-btn color="white" size="large" @click="$router.push('/login')" class="login-button">
-          התחבר עכשיו
-        </v-btn>
-      </div>
-    </div>
-
-    <!-- Add Task Dialog -->
-    <v-dialog v-model="showAddTaskDialog" max-width="600">
-      <v-card>
-        <v-card-title>
-          <span class="text-h5">{{ $t('tasks.addTask') }}</span>
-        </v-card-title>
-
-        <v-card-text>
-          <v-form ref="addTaskForm" v-model="formValid">
-            <v-text-field v-model="newTask.title" :label="$t('tasks.taskTitle')" :rules="[rules.required]" required />
-
-            <v-textarea v-model="newTask.description" :label="$t('tasks.taskDescription')" rows="3" />
-
-            <v-select v-model="newTask.listId" :items="availableLists" :item-title="'name'" :item-value="'id'"
-              :label="$t('lists.title')" :rules="[rules.required]" required />
-
-            <v-row>
-              <v-col cols="6">
-                <v-text-field v-model="newTask.dueDate" type="date" :label="$t('tasks.dueDate')" />
-              </v-col>
-              <v-col cols="6">
-                <v-text-field v-model="newTask.dueTime" type="time" :label="$t('tasks.dueTime')" />
-              </v-col>
-            </v-row>
-
-            <v-select v-model="newTask.priority" :items="priorityOptions" :item-title="'text'" :item-value="'value'"
-              :label="$t('tasks.priority')" />
-          </v-form>
-        </v-card-text>
-
-        <v-card-actions>
-          <v-spacer />
-          <v-btn color="grey" variant="text" @click="cancelAddTask">
-            {{ $t('common.cancel') }}
-          </v-btn>
-          <v-btn color="primary" :disabled="!formValid" @click="addTask">
-            {{ $t('common.add') }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTaskStore } from '@/stores/taskStore'
 import { useListStore } from '@/stores/listStore'
 import { useUserStore } from '@/stores/userStore'
-import type { CreateTaskForm } from '@/types'
+import type { Task } from '@/types'
 
 const router = useRouter()
 const taskStore = useTaskStore()
 const listStore = useListStore()
 const userStore = useUserStore()
+const hour = new Date().getHours()
+const greeting = computed(() => `${hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'}, ${userStore.user?.name?.split(' ')[0] || 'there'}`)
+const currentTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date())
+const dayProgress = Math.min(100, Math.max(0, ((hour - 6) / 16) * 100))
+const completionRate = computed(() => taskStore.tasks.length ? Math.round(taskStore.completedTasks.length / taskStore.tasks.length * 100) : 0)
+const focusTasks = computed(() => [...taskStore.pendingTasks].sort((a, b) => `${a.dueDate || '9999'}${a.dueTime || ''}`.localeCompare(`${b.dueDate || '9999'}${b.dueTime || ''}`)).slice(0, 5))
+const momentumMessage = computed(() => completionRate.value ? `You have completed ${completionRate.value}% of everything currently on your plate.` : 'Finish one small task to start today’s rhythm.')
+const collections = [
+  { title: 'Tasks', caption: 'Plan and finish', icon: 'mdi-check-circle-outline', to: '/tasks-lists', color: '#176b78', tint: '#dceff0' },
+  { title: 'Shopping', caption: 'Buy without forgetting', icon: 'mdi-cart-outline', to: '/shopping-lists', color: '#9a5a12', tint: '#fff0dc' },
+  { title: 'Appointments', caption: 'Keep every date', icon: 'mdi-calendar-blank-outline', to: '/appointment-lists', color: '#7252a3', tint: '#eee7fa' },
+  { title: 'Server care', caption: 'Maintain your VPS', icon: 'mdi-server-security', to: '/server-steward', color: '#42637a', tint: '#e3edf3' }
+]
 
-// Reactive data
-const showAddTaskDialog = ref(false)
-const formValid = ref(false)
-
-const newTask = ref<CreateTaskForm>({
-  title: '',
-  description: '',
-  listId: '',
-  priority: 'medium',
-  dueDate: '',
-  dueTime: ''
-})
-
-// Computed properties
-const user = computed(() => userStore.user)
-const lists = computed(() => listStore.lists)
-const tasks = computed(() => taskStore.tasks)
-const todayTasks = computed(() => taskStore.todayTasks)
-const pendingTasksCount = computed(() => taskStore.pendingTasks.length)
-const completedTasksCount = computed(() => taskStore.completedTasks.length)
-const overdueTasksCount = computed(() => taskStore.overdueTasks.length)
-const listsCount = computed(() => lists.value.length)
-
-// No default lists - user creates their own
-
-const availableLists = computed(() =>
-  lists.value.map(list => ({
-    id: list.id,
-    name: list.name
-  }))
-)
-
-const priorityOptions = computed(() => [
-  { text: 'נמוכה', value: 'low' },
-  { text: 'בינונית', value: 'medium' },
-  { text: 'גבוהה', value: 'high' },
-  { text: 'דחוף', value: 'urgent' }
-])
-
-// Validation rules
-const rules = {
-  required: (value: any) => !!value || 'שדה חובה'
+const formatTaskTime = (task: Task) => {
+  if (!task.dueDate) return 'No date yet'
+  const date = new Date(`${task.dueDate}T${task.dueTime || '12:00'}`)
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', ...(task.dueTime ? { hour: 'numeric', minute: '2-digit' } : {}) }).format(date)
 }
-
-// Methods
-const navigateToShopping = () => {
-  router.push('/shopping')
-}
-
-const navigateToShoppingLists = () => {
-  router.push('/shopping-lists')
-}
-
-const navigateToAppointments = () => {
-  router.push('/appointments')
-}
-
-const navigateToAppointmentLists = () => {
-  router.push('/appointment-lists')
-}
-
-const navigateToTasks = () => {
-  router.push('/tasks')
-}
-
-const navigateToTasksLists = () => {
-  router.push('/tasks-lists')
-}
-
-const navigateToIdeas = () => {
-  router.push('/lists')
-}
-
-const navigateToIdeasLists = () => {
-  router.push('/ideas-lists')
-}
-
-const navigateToVoice = () => {
-  router.push('/voice')
-}
-
-const navigateToMediaGallery = () => {
-  router.push('/media-gallery')
-}
-
-const addTask = async () => {
-  if (formValid.value) {
-    const result = await taskStore.addTask(newTask.value)
-    if (result.success) {
-      showAddTaskDialog.value = false
-      resetForm()
-    }
-  }
-}
-
-const cancelAddTask = () => {
-  showAddTaskDialog.value = false
-  resetForm()
-}
-
-const resetForm = () => {
-  newTask.value = {
-    title: '',
-    description: '',
-    listId: '',
-    priority: 'medium',
-    dueDate: '',
-    dueTime: ''
-  }
-}
-
-onMounted(() => {
-  // Load data if not already loaded
-  if (lists.value.length === 0) {
-    listStore.loadLists()
-  }
-  if (tasks.value.length === 0) {
-    taskStore.loadTasks()
-  }
+const openTask = (task: Task) => router.push(task.listId ? `/task-list/${task.listId}` : '/tasks')
+onMounted(async () => {
+  await Promise.all([
+    listStore.lists.length ? Promise.resolve() : listStore.loadLists(),
+    taskStore.tasks.length ? Promise.resolve() : taskStore.loadTasks()
+  ])
 })
 </script>
 
 <style scoped>
-.home-view {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  padding: 0;
-}
-
-        .header-section {
-          background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-          padding: 3rem 1rem 2rem 1rem;
-          text-align: center;
-          margin-top: 32px; /* Reduced margin to bring closer to App Bar */
-        }
-
-.header-content {
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-.app-title-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1rem;
-}
-
-.app-logo {
-  width: 60px;
-  height: 60px;
-  margin-right: 1rem;
-  object-fit: contain;
-}
-
-/* Responsive logo for mobile */
-@media (max-width: 768px) {
-  .app-logo {
-    width: 40px;
-    height: 40px;
-    margin-right: 0.5rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .app-logo {
-    width: 30px;
-    height: 30px;
-    margin-right: 0.25rem;
-  }
-}
-
-.header-icon {
-  color: white;
-  font-size: 2rem;
-}
-
-.app-title {
-  font-size: 3rem;
-  font-weight: 900;
-  color: #2c3e50;
-  margin: 0;
-  letter-spacing: 3px;
-  text-align: center;
-}
-
-/* Responsive title for mobile */
-@media (max-width: 768px) {
-  .app-title {
-    font-size: 2.2rem;
-    letter-spacing: 2px;
-  }
-}
-
-@media (max-width: 480px) {
-  .app-title {
-    font-size: 1.8rem;
-    letter-spacing: 1px;
-  }
-}
-
-.app-subtitle {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0;
-  letter-spacing: 2px;
-  text-align: center;
-}
-
-.category-card {
-  height: 200px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 16px;
-  position: relative;
-  overflow: hidden;
-}
-
-.category-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
-}
-
-.card-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: flex-start;
-  text-align: left;
-  position: relative;
-  z-index: 2;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.card-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #2c3e50;
-  margin: 0;
-}
-
-.card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.card-item {
-  display: flex;
-  align-items: center;
-}
-
-.card-text {
-  font-size: 0.9rem;
-  color: #2c3e50;
-  margin: 0;
-}
-
-/* Card Colors */
-.shopping-card {
-  background: #E3F2FD;
-}
-
-.appointments-card {
-  background: #E8F5E8;
-}
-
-.todos-card {
-  background: #FCE4EC;
-}
-
-.ideas-card {
-  background: #FFF8E1;
-}
-
-.voice-card {
-  background: #E8F5E8;
-}
-
-.media-card {
-  background: #F3E5F5;
-}
-
-/* Footer Styles */
-.footer-section {
-  background: linear-gradient(135deg, #1976D2 0%, #42A5F5 100%);
-  padding: 2rem 0;
-  margin-top: 2rem;
-}
-
-.footer-content {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.add-button {
-  font-size: 1.1rem;
-  font-weight: 600;
-  padding: 12px 32px;
-  text-transform: none;
-  letter-spacing: 1px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
-}
-
-.add-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-}
-
-/* Responsive Design */
-@media (max-width: 600px) {
-  .app-title {
-    font-size: 2rem;
-  }
-
-  .app-subtitle {
-    font-size: 0.9rem;
-  }
-
-  .category-card {
-    height: 180px;
-  }
-
-  .card-title {
-    font-size: 1.3rem;
-  }
-
-  .card-description {
-    font-size: 0.8rem;
-  }
-}
-
-/* Animation for cards */
-.category-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.category-card:hover::before {
-  opacity: 1;
-}
-
-/* Icon animation */
-.category-card .v-icon {
-  transition: transform 0.3s ease;
-}
-
-.category-card:hover .v-icon {
-  transform: scale(1.1);
-}
-
-/* Login Message Styling */
-.login-message {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-.login-content {
-  text-align: center;
-  max-width: 500px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  padding: 3rem 2rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
-
-.login-title {
-  font-size: 2.5rem;
-  font-weight: 900;
-  color: #2c3e50;
-  margin: 0 0 1rem 0;
-  letter-spacing: 2px;
-}
-
-.login-subtitle {
-  font-size: 1.2rem;
-  color: #2c3e50;
-  margin: 0 0 2rem 0;
-  opacity: 0.8;
-}
-
-.login-button {
-  color: #2c3e50 !important;
-  font-weight: 700;
-  text-transform: none;
-  letter-spacing: 1px;
-  padding: 12px 32px;
-  border-radius: 25px;
-  transition: all 0.3s ease;
-}
-
-.login-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-}
-
-/* Responsive Design */
-@media (max-width: 600px) {
-  .header-section {
-    margin-top: 24px; /* Reduced margin for mobile to bring closer to App Bar */
-    padding: 2.5rem 1rem 1.5rem 1rem;
-  }
-
-  .app-title {
-    font-size: 2rem;
-  }
-
-  .app-subtitle {
-    font-size: 1rem;
-  }
-
-  .login-content {
-    padding: 2rem 1rem;
-    margin: 1rem;
-  }
-
-  .login-title {
-    font-size: 2rem;
-  }
-
-  .login-subtitle {
-    font-size: 1rem;
-  }
-}
+.today-page{width:min(100%,1440px);margin:0 auto;padding:clamp(24px,4vw,54px)}.today-hero{display:flex;align-items:end;justify-content:space-between;gap:36px;margin-bottom:34px}.eyebrow{margin:0 0 9px;color:var(--primary);font:700 .7rem var(--font-utility);letter-spacing:.15em;text-transform:uppercase}.today-hero h1{max-width:780px;margin:0;color:var(--ink);font:650 clamp(2.5rem,5vw,5.2rem)/.96 var(--font-display);letter-spacing:-.06em}.hero-copy{max-width:650px;margin:18px 0 0;color:var(--ink-muted);font-size:1.04rem}.hero-actions{display:flex;flex:0 0 auto;gap:10px}.hero-actions .v-btn{height:48px;border-radius:13px}
+.dayline{margin-bottom:22px;padding:20px 24px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}.dayline-track{position:relative;height:4px;border-radius:9px;background:#e7edef}.dayline-progress{position:absolute;height:100%;border-radius:inherit;background:var(--primary)}.dayline-track i{position:absolute;top:50%;width:14px;height:14px;border:3px solid var(--surface);border-radius:50%;background:var(--accent);box-shadow:0 0 0 1px var(--primary);transform:translate(-50%,-50%)}.dayline-labels{display:flex;justify-content:space-between;margin-top:11px;color:var(--ink-soft);font:600 .68rem var(--font-utility)}.dayline-labels strong{color:var(--ink)}
+.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}.metric-grid article{display:flex;align-items:center;gap:13px;padding:17px;border:1px solid var(--line);border-radius:17px;background:var(--surface)}.metric-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:13px}.metric-icon--today{color:#9a5a12;background:#fff0dc}.metric-icon--pending{color:#42637a;background:#e3edf3}.metric-icon--overdue{color:#b24045;background:#fde8e8}.metric-icon--done{color:#25755c;background:#dff2ea}.metric-grid strong,.metric-grid small{display:block}.metric-grid strong{color:var(--ink);font:700 1.45rem var(--font-display)}.metric-grid small{color:var(--ink-soft);font-size:.72rem}
+.dashboard-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(310px,.8fr);gap:22px}.focus-panel,.progress-panel,.collections-panel{border:1px solid var(--line);border-radius:22px;background:var(--surface)}.focus-panel{padding:25px}.section-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.section-heading h2,.progress-panel h2{margin:0;color:var(--ink);font:650 1.35rem var(--font-display);letter-spacing:-.025em}.focus-list{display:grid}.focus-task{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;min-height:72px;border-top:1px solid var(--line)}.task-check{display:grid;place-items:center;width:28px;height:28px;border:2px solid #a9b7bc;border-radius:50%;color:transparent;background:transparent;cursor:pointer}.task-check:hover{border-color:var(--success);color:#fff;background:var(--success)}.task-copy{min-width:0}.task-copy strong{display:block;overflow:hidden;color:var(--ink);font-size:.94rem;text-overflow:ellipsis;white-space:nowrap}.task-copy span{display:flex;align-items:center;gap:5px;margin-top:5px;color:var(--ink-soft);font-size:.72rem}.task-copy em{margin-left:6px;padding:2px 7px;border-radius:20px;font-style:normal;text-transform:capitalize}.priority-urgent,.priority-high{color:#a13b40;background:#fde8e8}.priority-medium{color:#8a5c12;background:#fff0dc}.priority-low{color:#25755c;background:#dff2ea}
+.empty-focus{display:grid;place-items:center;padding:50px 20px;text-align:center}.empty-focus>span{display:grid;place-items:center;width:62px;height:62px;border-radius:50%;color:var(--primary);background:var(--primary-soft)}.empty-focus h3{margin:15px 0 4px}.empty-focus p{margin:0 0 18px;color:var(--ink-muted)}.task-skeleton{display:grid;gap:12px}.task-skeleton span{height:58px;border-radius:12px;background:linear-gradient(90deg,#eef3f3 25%,#f8fafa 50%,#eef3f3 75%);background-size:200% 100%;animation:shimmer 1.3s infinite}@keyframes shimmer{to{background-position:-200% 0}}
+.side-stack{display:grid;align-content:start;gap:22px}.progress-panel{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:18px;padding:24px;background:#132a3a;color:#d3e0e5}.progress-panel .eyebrow{color:var(--accent)}.progress-panel h2{color:#fff}.progress-panel p:last-child{margin:8px 0 0;color:#aebfc7;font-size:.8rem;line-height:1.5}.progress-ring{display:grid;place-items:center;width:92px;height:92px;border-radius:50%;background:conic-gradient(var(--accent) var(--progress),rgba(255,255,255,.12) 0)}.progress-ring::before{content:"";grid-area:1/1;width:72px;height:72px;border-radius:50%;background:#132a3a}.progress-ring span{z-index:1;grid-area:1/1;text-align:center}.progress-ring strong,.progress-ring small{display:block}.progress-ring strong{color:#fff;font-size:1.35rem}.progress-ring small{color:#aebfc7;font-size:.65rem}
+.collections-panel{padding:24px}.collection-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.collection-grid button{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:12px;border:1px solid transparent;border-radius:14px;background:var(--surface-soft);text-align:left;cursor:pointer}.collection-grid button:hover{border-color:var(--line);background:#fff}.collection-grid button>span{grid-row:span 2;display:grid;place-items:center;width:36px;height:36px;border-radius:11px}.collection-grid strong,.collection-grid small{display:block;min-width:0}.collection-grid strong{align-self:end;color:var(--ink);font-size:.78rem}.collection-grid small{color:var(--ink-soft);font-size:.64rem}
+@media(max-width:1100px){.dashboard-grid{grid-template-columns:1fr}.side-stack{grid-template-columns:1fr 1fr}.metric-grid{grid-template-columns:1fr 1fr}.today-hero{align-items:start;flex-direction:column}.hero-actions{width:100%}}
+@media(max-width:700px){.today-page{padding:24px 16px}.today-hero h1{font-size:2.8rem}.hero-actions{display:grid;grid-template-columns:1fr 1fr}.metric-grid{gap:8px}.metric-grid article{padding:12px}.metric-icon{width:36px;height:36px}.dashboard-grid{gap:14px}.focus-panel{padding:18px}.side-stack{grid-template-columns:1fr}.collection-grid{grid-template-columns:1fr 1fr}.dayline{padding:18px}.metric-grid small{font-size:.66rem}}
 </style>

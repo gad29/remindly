@@ -15,6 +15,20 @@ export const useUserStore = defineStore('user', () => {
   const userLanguage = computed(() => user.value?.language || 'he')
   const userTheme = computed(() => user.value?.theme || 'light')
 
+  const getErrorMessage = (err: any, fallback: string) => {
+    if (!err.response) return 'Cannot reach Remindly. Check your connection and try again.'
+    return err.response.data?.error || err.response.data?.message || err.response.data?.details?.[0]?.msg || fallback
+  }
+
+  const applySession = (responseData: any) => {
+    const nextUser = responseData.user || responseData.data?.user
+    const token = responseData.token || responseData.data?.token
+    if (!nextUser || !token) throw new Error('The server returned an incomplete login session')
+    localStorage.setItem('token', token)
+    user.value = nextUser
+    settings.value = responseData.settings || responseData.data?.settings || null
+  }
+
   // Actions
   const login = async (email: string, password: string) => {
     loading.value = true
@@ -25,21 +39,14 @@ export const useUserStore = defineStore('user', () => {
       
       // Backend returns: { success: true, user: ..., settings: ..., token: ... }
       const responseData = response.data
-      user.value = responseData.user || responseData.data?.user
-      settings.value = responseData.settings || responseData.data?.settings
-      
-      // Store token
-      const token = responseData.token || responseData.data?.token
-      if (token) {
-        localStorage.setItem('token', token)
-      } else {
-        console.error('No token received from login response:', responseData)
-        throw new Error('No token received from server')
-      }
+      applySession(responseData)
       
       return { success: true }
     } catch (err: any) {
-      error.value = err.response?.data?.message || 'שגיאה בהתחברות'
+      user.value = null
+      settings.value = null
+      localStorage.removeItem('token')
+      error.value = getErrorMessage(err, 'Login failed. Check your email and password.')
       return { success: false, error: error.value }
     } finally {
       loading.value = false
@@ -60,21 +67,14 @@ export const useUserStore = defineStore('user', () => {
       
       // Backend returns: { success: true, user: ..., settings: ..., token: ... }
       const responseData = response.data
-      user.value = responseData.user || responseData.data?.user
-      settings.value = responseData.settings || responseData.data?.settings
-      
-      // Store token
-      const token = responseData.token || responseData.data?.token
-      if (token) {
-        localStorage.setItem('token', token)
-      } else {
-        console.error('No token received from register response:', responseData)
-        throw new Error('No token received from server')
-      }
+      applySession(responseData)
       
       return { success: true }
     } catch (err: any) {
-      error.value = err.response?.data?.message || 'שגיאה בהרשמה'
+      user.value = null
+      settings.value = null
+      localStorage.removeItem('token')
+      error.value = getErrorMessage(err, 'Registration failed. Review your details and try again.')
       return { success: false, error: error.value }
     } finally {
       loading.value = false
@@ -115,7 +115,7 @@ export const useUserStore = defineStore('user', () => {
       user.value = responseData.user || responseData.data?.user
       settings.value = responseData.settings || responseData.data?.settings
     } catch (err: any) {
-      error.value = err.response?.data?.message || 'שגיאה בטעינת המשתמש'
+      error.value = getErrorMessage(err, 'Your session has expired. Please sign in again.')
       localStorage.removeItem('token')
       user.value = null
       settings.value = null
@@ -156,7 +156,8 @@ export const useUserStore = defineStore('user', () => {
     
     try {
       const response = await api.put('/auth/profile', profileData)
-      user.value = { ...user.value, ...response.data.user }
+      const updatedUser = response.data.user || response.data.data?.user
+      user.value = { ...user.value, ...updatedUser }
       
       return { success: true }
     } catch (err: any) {

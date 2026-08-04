@@ -92,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { Notification } from '@/types'
@@ -239,31 +239,9 @@ const showNotificationToast = (type: string, message: string) => {
     showToast.value = true
 }
 
-// Simulate real-time notifications
-const simulateNotification = () => {
-    const types = ['task_reminder', 'voice_processed', 'price_updated']
-    const messages = [
-        'משימה חדשה נוצרה',
-        'הקלטה קולית עובדה',
-        'מחיר עודכן'
-    ]
-
-    const randomType = types[Math.floor(Math.random() * types.length)]
-    const randomMessage = messages[Math.floor(Math.random() * messages.length)]
-
-    showNotificationToast(randomType, randomMessage)
-}
-
 // Lifecycle
 onMounted(() => {
     loadNotifications()
-
-    // Simulate notifications every 30 seconds for demo
-    const interval = setInterval(simulateNotification, 30000)
-
-    onUnmounted(() => {
-        clearInterval(interval)
-    })
 })
 </script>
 
