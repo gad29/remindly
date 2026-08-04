@@ -1,7 +1,5 @@
 import { Sequelize } from "sequelize";
-import dotenv from "dotenv";
-
-dotenv.config();
+import "./env.js";
 
 // PostgreSQL Database Configuration
 // This application uses PostgreSQL ONLY - SQLite is NOT supported

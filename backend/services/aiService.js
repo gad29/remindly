@@ -1,13 +1,20 @@
 import OpenAI from "openai";
+import "../config/env.js";
 import { Task } from "../models/Task.js";
 import { List } from "../models/List.js";
 import { ShoppingItem } from "../models/ShoppingItem.js";
 import { Reminder } from "../models/Reminder.js";
 import { Category } from "../models/Category.js";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openai;
+
+function getOpenAI() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is not configured. The OpenRouter assistant can still be used.");
+  }
+  if (!openai) openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return openai;
+}
 
 class AIService {
   /**
@@ -20,7 +27,7 @@ class AIService {
   async processText(text, userId, language = "he") {
     try {
       const prompt = this.buildPrompt(text, language);
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: "gpt-4",
         messages: [
           {
@@ -393,7 +400,7 @@ Instructions:
    */
   async translateText(text, fromLang, toLang) {
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: "gpt-4",
         messages: [
           {
