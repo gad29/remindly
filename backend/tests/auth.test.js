@@ -58,7 +58,7 @@ describe("Authentication Routes", () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error.toLowerCase()).toContain("email");
+      expect(response.body.error).toBe("User already exists");
     });
 
     it("should validate required fields", async () => {
@@ -68,7 +68,9 @@ describe("Authentication Routes", () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(JSON.stringify(response.body.details).toLowerCase()).toContain("required");
+      expect(response.body.details.map((detail) => detail.path)).toEqual(
+        expect.arrayContaining(["name", "email", "password"])
+      );
     });
 
     it("should validate email format", async () => {
