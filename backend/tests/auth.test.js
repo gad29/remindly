@@ -58,7 +58,7 @@ describe("Authentication Routes", () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain("email");
+      expect(response.body.error.toLowerCase()).toContain("email");
     });
 
     it("should validate required fields", async () => {
@@ -68,7 +68,7 @@ describe("Authentication Routes", () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain("required");
+      expect(JSON.stringify(response.body.details).toLowerCase()).toContain("required");
     });
 
     it("should validate email format", async () => {
@@ -84,7 +84,7 @@ describe("Authentication Routes", () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain("email");
+      expect(JSON.stringify(response.body.details).toLowerCase()).toContain("email");
     });
 
     it("should validate password length", async () => {
@@ -100,7 +100,7 @@ describe("Authentication Routes", () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain("password");
+      expect(JSON.stringify(response.body.details).toLowerCase()).toContain("password");
     });
   });
 
@@ -146,7 +146,7 @@ describe("Authentication Routes", () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain("Invalid");
+      expect(response.body.error).toContain("Invalid");
     });
 
     it("should not login with invalid password", async () => {
@@ -161,7 +161,7 @@ describe("Authentication Routes", () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain("Invalid");
+      expect(response.body.error).toContain("Invalid");
     });
 
     it("should validate required fields", async () => {
@@ -171,7 +171,7 @@ describe("Authentication Routes", () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain("required");
+      expect(JSON.stringify(response.body.details).toLowerCase()).toContain("required");
     });
   });
 

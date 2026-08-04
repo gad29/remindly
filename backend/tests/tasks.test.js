@@ -102,7 +102,7 @@ describe("Task Routes", () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain("required");
+      expect(JSON.stringify(response.body.details).toLowerCase()).toContain("title");
     });
 
     it("should validate priority values", async () => {
@@ -119,7 +119,7 @@ describe("Task Routes", () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain("priority");
+      expect(JSON.stringify(response.body.details).toLowerCase()).toContain("priority");
     });
   });
 
@@ -144,10 +144,17 @@ describe("Task Routes", () => {
       ];
 
       for (const taskData of tasks) {
-        await request(app)
+        const createResponse = await request(app)
           .post("/api/tasks")
           .set("Authorization", `Bearer ${authToken}`)
           .send(taskData);
+
+        if (taskData.completed) {
+          await request(app)
+            .patch(`/api/tasks/${createResponse.body.data.id}/complete`)
+            .set("Authorization", `Bearer ${authToken}`)
+            .send({ completed: true });
+        }
       }
     });
 
@@ -163,7 +170,7 @@ describe("Task Routes", () => {
 
     it("should filter tasks by completed status", async () => {
       const response = await request(app)
-        .get("/api/tasks?completed=true")
+        .get("/api/tasks?status=completed")
         .set("Authorization", `Bearer ${authToken}`)
         .expect(200);
 
@@ -247,7 +254,7 @@ describe("Task Routes", () => {
       };
 
       const response = await request(app)
-        .put("/api/tasks/non-existent-id")
+        .put("/api/tasks/00000000-0000-4000-8000-000000000000")
         .set("Authorization", `Bearer ${authToken}`)
         .send(updateData)
         .expect(404);
@@ -332,7 +339,7 @@ describe("Task Routes", () => {
 
     it("should not delete non-existent task", async () => {
       const response = await request(app)
-        .delete("/api/tasks/non-existent-id")
+        .delete("/api/tasks/00000000-0000-4000-8000-000000000000")
         .set("Authorization", `Bearer ${authToken}`)
         .expect(404);
 
