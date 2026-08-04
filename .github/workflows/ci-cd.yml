@@ -122,6 +122,9 @@ jobs:
     needs: [backend-test, frontend-test, mobile-test]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
 
     steps:
     - uses: actions/checkout@v4
@@ -145,7 +148,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Build and push Backend image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: ./backend
         push: true
@@ -153,7 +156,7 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
 
     - name: Build and push Web App image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: ./web-app
         push: true

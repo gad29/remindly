@@ -1,5 +1,5 @@
 # Multi-stage build
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -24,10 +24,6 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy PWA files
-COPY public/manifest.json /usr/share/nginx/html/
-COPY public/sw.js /usr/share/nginx/html/
 
 # Set proper permissions
 RUN chown -R nginx:nginx /usr/share/nginx/html
