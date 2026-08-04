@@ -4,6 +4,7 @@ import { Task } from "../models/Task.js";
 import { List } from "../models/List.js";
 
 const getModel = () => process.env.OPENROUTER_MODEL || "google/gemini-3.1-flash-lite";
+const getOpenAIModel = () => process.env.OPENAI_FALLBACK_MODEL || "gpt-4.1-mini";
 
 const actionSchema = {
   name: "remindly_task_actions",
@@ -39,7 +40,7 @@ const actionSchema = {
   }
 };
 
-const getClient = () => {
+const getOpenRouterClient = () => {
   if (!process.env.OPENROUTER_API_KEY) {
     const error = new Error("OpenRouter is not configured");
     error.code = "OPENROUTER_NOT_CONFIGURED";
@@ -56,11 +57,33 @@ const getClient = () => {
   });
 };
 
+const getOpenAIClient = () => {
+  if (!process.env.OPENAI_API_KEY) {
+    const error = new Error("OpenAI fallback is not configured");
+    error.code = "OPENAI_NOT_CONFIGURED";
+    throw error;
+  }
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+};
+
+const completionInput = (text, lists, tasks, language) => ({
+  temperature: 0.1,
+  max_tokens: 1200,
+  response_format: { type: "json_schema", json_schema: actionSchema },
+  messages: [
+    {
+      role: "system",
+      content: `You are Remindly's task interpreter. Convert a spoken or typed command into a small set of proposed task actions. Never delete data. Match an existing task only when the title and intent clearly identify it. Use ISO dates and 24-hour times. Today is ${new Date().toISOString()}. The user's language is ${language}. Return no actions for conversational text or uncertain requests; ask a concise clarification in reply instead.`
+    },
+    { role: "user", content: JSON.stringify({ command: text, lists, tasks }) }
+  ]
+});
+
 const safeDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || "") ? value : null;
 const safeTime = (value) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value || "") ? value : null;
 
 class OpenRouterService {
-  async preview(text, userId, language = "en") {
+  async preview(text, userId, language = "en", provider = "auto") {
     const [tasks, lists] = await Promise.all([
       Task.findAll({
         where: { userId },
@@ -71,27 +94,31 @@ class OpenRouterService {
       List.findAll({ where: { userId, isArchived: false }, attributes: ["id", "name", "description"] })
     ]);
 
-    const completion = await getClient().chat.completions.create({
-      model: getModel(),
-      temperature: 0.1,
-      max_tokens: 1200,
-      provider: { require_parameters: true },
-      response_format: { type: "json_schema", json_schema: actionSchema },
-      messages: [
-        {
-          role: "system",
-          content: `You are Remindly's task interpreter. Convert a spoken or typed command into a small set of proposed task actions. Never delete data. Match an existing task only when the title and intent clearly identify it. Use ISO dates and 24-hour times. Today is ${new Date().toISOString()}. The user's language is ${language}. Return no actions for conversational text or uncertain requests; ask a concise clarification in reply instead.`
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ command: text, lists, tasks })
-        }
-      ]
-    });
+    const input = completionInput(text, lists, tasks, language);
+    let completion;
+    let usedProvider;
+
+    if (provider === "openai") {
+      usedProvider = "openai";
+      completion = await getOpenAIClient().chat.completions.create({ ...input, model: getOpenAIModel() });
+    } else {
+      try {
+        usedProvider = "openrouter";
+        completion = await getOpenRouterClient().chat.completions.create({
+          ...input,
+          model: getModel(),
+          provider: { require_parameters: true }
+        });
+      } catch (error) {
+        if (provider !== "auto" || !process.env.OPENAI_API_KEY) throw error;
+        usedProvider = "openai";
+        completion = await getOpenAIClient().chat.completions.create({ ...input, model: getOpenAIModel() });
+      }
+    }
 
     const content = completion.choices?.[0]?.message?.content;
-    if (!content) throw new Error("OpenRouter returned an empty response");
-    return { ...JSON.parse(content), model: completion.model || getModel() };
+    if (!content) throw new Error(`${usedProvider} returned an empty response`);
+    return { ...JSON.parse(content), provider: usedProvider, model: completion.model || (usedProvider === "openai" ? getOpenAIModel() : getModel()) };
   }
 
   async apply(actions, userId) {
@@ -148,7 +175,13 @@ class OpenRouterService {
   }
 
   status() {
-    return { configured: Boolean(process.env.OPENROUTER_API_KEY), model: getModel() };
+    return {
+      configured: Boolean(process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY),
+      openRouterConfigured: Boolean(process.env.OPENROUTER_API_KEY),
+      openAIConfigured: Boolean(process.env.OPENAI_API_KEY),
+      model: getModel(),
+      openAIModel: getOpenAIModel()
+    };
   }
 }
 

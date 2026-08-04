@@ -119,6 +119,26 @@
               <v-window-item value="integrations">
                 <div class="settings-section">
                   <h3 class="section-title">
+                    <v-icon class="mr-2">mdi-robot-outline</v-icon>
+                    AI provider
+                  </h3>
+                  <v-card variant="outlined" class="integration-card mb-6">
+                    <v-card-text>
+                      <p class="mb-4">Automatic uses OpenRouter first and switches to OpenAI only if OpenRouter fails.</p>
+                      <v-select
+                        v-model="aiProvider"
+                        :items="aiProviders"
+                        label="Provider mode"
+                        variant="outlined"
+                        :loading="savingAI"
+                        @update:model-value="saveAIProvider"
+                      />
+                      <v-alert v-if="aiStatus" type="info" variant="tonal" density="compact">
+                        OpenRouter: {{ aiStatus.openRouterConfigured ? 'ready' : 'not configured' }} · OpenAI backup: {{ aiStatus.openAIConfigured ? 'ready' : 'not configured' }}
+                      </v-alert>
+                    </v-card-text>
+                  </v-card>
+                  <h3 class="section-title">
                     <v-icon class="mr-2">mdi-calendar-account</v-icon>
                     Google Calendar Integration
                   </h3>
@@ -155,10 +175,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { apiService } from '@/utils/api'
 
 const { t } = useI18n()
 
 const activeTab = ref('general')
+const aiProvider = ref<'auto' | 'openrouter' | 'openai'>('auto')
+const aiStatus = ref<any>(null)
+const savingAI = ref(false)
+const aiProviders = [
+  { title: 'Automatic — OpenRouter with OpenAI backup', value: 'auto' },
+  { title: 'OpenRouter only', value: 'openrouter' },
+  { title: 'OpenAI only', value: 'openai' }
+]
 const settings = ref({
   language: 'he',
   theme: 'light',
@@ -179,10 +208,22 @@ const themes = [
 
 const loadSettings = async () => {
   try {
-    // TODO: Implement API call to load settings
-    console.log('Loading settings...')
+    const response = await apiService.assistant.status()
+    aiStatus.value = response.data.data
+    aiProvider.value = response.data.data.provider || 'auto'
   } catch (error) {
     console.error('Error loading settings:', error)
+  }
+}
+
+const saveAIProvider = async () => {
+  savingAI.value = true
+  try {
+    await apiService.assistant.updatePreferences(aiProvider.value)
+  } catch (error) {
+    console.error('Error saving AI provider:', error)
+  } finally {
+    savingAI.value = false
   }
 }
 

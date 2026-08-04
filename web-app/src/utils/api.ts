@@ -209,7 +209,9 @@ const apiService = {
   },
 
   assistant: {
-    status: () => api.get<ApiResponse<{ configured: boolean; model: string }>>('/assistant/status'),
+    status: () => api.get<ApiResponse<any>>('/assistant/status'),
+    updatePreferences: (provider: 'auto' | 'openrouter' | 'openai') =>
+      api.put<ApiResponse<{ provider: string }>>('/assistant/preferences', { provider }),
     preview: (text: string, language: 'he' | 'en') =>
       api.post<ApiResponse<any>>('/assistant/preview', { text, language }),
     apply: (actions: any[]) =>
