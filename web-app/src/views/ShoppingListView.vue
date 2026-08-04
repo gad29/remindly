@@ -30,6 +30,7 @@
                   <button v-for="product in productSuggestions" :key="product.barcode" type="button" @click="selectProduct(product)">
                     <span class="product-thumb"><img v-if="product.imageUrl" :src="product.imageUrl" :alt="product.name"/><v-icon v-else icon="mdi-package-variant-closed"/></span>
                     <span class="product-result-copy"><strong>{{ product.name }}</strong><small>{{ [product.brand, product.quantity].filter(Boolean).join(' · ') || `Barcode ${product.barcode}` }}</small></span>
+                    <span v-if="product.pricing?.summary?.cheapest" class="result-price">From ₪{{ product.pricing.summary.cheapest.toFixed(2) }}</span>
                     <v-icon icon="mdi-chevron-right"/>
                   </button>
                 </div>
@@ -38,7 +39,7 @@
                   <div class="selected-copy"><div class="section-kicker">SELECTED PRODUCT</div><h3>{{ selectedProduct.name }}</h3><p>{{ [selectedProduct.brand, selectedProduct.quantity].filter(Boolean).join(' · ') }}</p><div class="product-badges"><span v-if="selectedProduct.nutritionGrade">Nutri-score {{ String(selectedProduct.nutritionGrade).toUpperCase() }}</span><span>{{ selectedProduct.barcode }}</span><span v-if="priceSummary">From ₪{{ priceSummary.cheapest || priceSummary.minPrice }}</span></div></div>
                   <div class="selected-actions"><v-text-field v-model.number="smartQuantity" type="number" min="1" label="Qty" variant="outlined" hide-details/><v-btn color="primary" :loading="addingSmartProduct" @click="addSmartProduct">Add to list</v-btn></div>
                 </article>
-                <div v-if="productQuery.length >= 2 && !searchingProducts && !productSuggestions.length && !selectedProduct" class="no-product"><span>No catalogue match. You can still add it manually.</span><v-btn variant="text" size="small" @click="openManualAdd">Add manually</v-btn></div>
+                <div v-if="productQuery.length >= 3 && !searchingProducts && !productSuggestions.length && !selectedProduct" class="no-product"><span>No catalogue match. You can still add it manually.</span><v-btn variant="text" size="small" @click="openManualAdd">Add manually</v-btn></div>
               </section>
               
               <!-- Shopping Items List -->
@@ -396,7 +397,7 @@ watch(productQuery, (query) => {
   window.clearTimeout(searchTimer)
   selectedProduct.value = null
   priceSummary.value = null
-  if (!query || query.trim().length < 2) { productSuggestions.value = []; return }
+  if (!query || query.trim().length < 3) { productSuggestions.value = []; return }
   searchTimer = window.setTimeout(async () => {
     searchingProducts.value = true
     try {
@@ -404,16 +405,18 @@ watch(productQuery, (query) => {
       productSuggestions.value = response.data.data || []
     } catch { productSuggestions.value = [] }
     finally { searchingProducts.value = false }
-  }, 650)
+  }, 900)
 })
 
 const selectProduct = async (product: any) => {
   selectedProduct.value = product
+  priceSummary.value = product.pricing?.summary || null
   productSuggestions.value = []
   try {
-    const response = await apiService.grocery.getProduct(product.barcode)
-    selectedProduct.value = response.data.data || product
-    priceSummary.value = selectedProduct.value.pricing?.summary || null
+    const response = await apiService.grocery.getProduct(product.barcode, { skipPrices: true })
+    const details = response.data.data || {}
+    selectedProduct.value = { ...product, ...details, pricing: product.pricing || details.pricing }
+    priceSummary.value = selectedProduct.value.pricing?.summary || priceSummary.value
   } catch { /* Basic catalogue data is still useful offline from price providers. */ }
 }
 
@@ -1121,7 +1124,7 @@ const shareViaWebAPI = async () => {
 }
 
 .shopping-list-card{border:1px solid #dce3df;border-radius:22px;overflow:hidden;box-shadow:none!important}
-.smart-add{padding:22px;border:1px solid #cfe0db;border-radius:20px;background:#f7fbf9;margin-bottom:24px}.smart-copy{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}.smart-icon{width:46px;height:46px;flex:0 0 auto;border-radius:14px;background:#dceee6;color:#245b55;display:grid;place-items:center}.section-kicker{font:700 10px ui-monospace,monospace;letter-spacing:.13em;color:#49716b;margin-bottom:4px}.smart-copy h2,.selected-copy h3{color:#173d3a;margin:0 0 4px}.smart-copy p,.selected-copy p{color:#687572;margin:0;font-size:.82rem}.product-results{border:1px solid #dce3df;border-radius:15px;background:#fff;margin-top:8px;overflow:hidden}.product-results button{width:100%;min-height:68px;padding:9px 12px;display:flex;align-items:center;gap:12px;text-align:left;border:0;border-bottom:1px solid #edf1ef;background:#fff;color:#173d3a}.product-results button:last-child{border-bottom:0}.product-results button:hover,.product-results button:focus-visible{background:#f0f7f4}.product-thumb,.selected-image{display:grid;place-items:center;background:#eef3f1;color:#6a7d79;overflow:hidden}.product-thumb{width:48px;height:48px;border-radius:11px}.product-thumb img,.selected-image img{width:100%;height:100%;object-fit:contain}.product-result-copy{display:flex;flex:1;min-width:0;flex-direction:column}.product-result-copy strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.product-result-copy small{color:#75817f;margin-top:3px}.selected-product{display:grid;grid-template-columns:82px 1fr auto;gap:16px;align-items:center;margin-top:14px;padding:14px;background:#fff;border:1px solid #cfe0db;border-radius:16px}.selected-image{width:82px;height:82px;border-radius:13px}.product-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.product-badges span{font-size:.66rem;color:#245b55;background:#e2f1eb;padding:4px 7px;border-radius:8px}.selected-actions{display:grid;grid-template-columns:78px 130px;gap:8px;align-items:center}.no-product{display:flex;justify-content:space-between;align-items:center;color:#687572;font-size:.8rem;padding-top:12px}
+.smart-add{padding:22px;border:1px solid #cfe0db;border-radius:20px;background:#f7fbf9;margin-bottom:24px}.smart-copy{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}.smart-icon{width:46px;height:46px;flex:0 0 auto;border-radius:14px;background:#dceee6;color:#245b55;display:grid;place-items:center}.section-kicker{font:700 10px ui-monospace,monospace;letter-spacing:.13em;color:#49716b;margin-bottom:4px}.smart-copy h2,.selected-copy h3{color:#173d3a;margin:0 0 4px}.smart-copy p,.selected-copy p{color:#687572;margin:0;font-size:.82rem}.product-results{border:1px solid #dce3df;border-radius:15px;background:#fff;margin-top:8px;overflow:hidden}.product-results button{width:100%;min-height:68px;padding:9px 12px;display:flex;align-items:center;gap:12px;text-align:left;border:0;border-bottom:1px solid #edf1ef;background:#fff;color:#173d3a}.product-results button:last-child{border-bottom:0}.product-results button:hover,.product-results button:focus-visible{background:#f0f7f4}.product-thumb,.selected-image{display:grid;place-items:center;background:#eef3f1;color:#6a7d79;overflow:hidden}.product-thumb{width:48px;height:48px;border-radius:11px}.product-thumb img,.selected-image img{width:100%;height:100%;object-fit:contain}.product-result-copy{display:flex;flex:1;min-width:0;flex-direction:column}.product-result-copy strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.product-result-copy small{color:#75817f;margin-top:3px}.result-price{white-space:nowrap;border-radius:999px;background:#e2f1eb;color:#245b55;padding:5px 9px;font-size:.72rem;font-weight:700}.selected-product{display:grid;grid-template-columns:82px 1fr auto;gap:16px;align-items:center;margin-top:14px;padding:14px;background:#fff;border:1px solid #cfe0db;border-radius:16px}.selected-image{width:82px;height:82px;border-radius:13px}.product-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.product-badges span{font-size:.66rem;color:#245b55;background:#e2f1eb;padding:4px 7px;border-radius:8px}.selected-actions{display:grid;grid-template-columns:78px 130px;gap:8px;align-items:center}.no-product{display:flex;justify-content:space-between;align-items:center;color:#687572;font-size:.8rem;padding-top:12px}
 
 .items-list {
   margin-bottom: 2rem;

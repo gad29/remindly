@@ -31,7 +31,7 @@ const normalizeProduct = (product = {}) => ({
 class GroceryService {
   async searchProducts(query, limit = 8) {
     const normalizedQuery = query.trim();
-    if (normalizedQuery.length < 2) return [];
+    if (normalizedQuery.length < 3) return [];
     if (/^\d{8,14}$/.test(normalizedQuery)) {
       const product = await this.getProduct(normalizedQuery).catch(() => null);
       if (product) return [product];
@@ -41,6 +41,15 @@ class GroceryService {
     const key = `search:${normalizedQuery.toLowerCase()}:${limit}`;
     const cached = getCached(key);
     if (cached) return cached;
+
+    if (process.env.APIFY_TOKEN) {
+      try {
+        const products = await this.searchIsraeliProducts(normalizedQuery, limit);
+        if (products.length) { setCached(key, products); return products; }
+      } catch (error) {
+        console.warn("Israeli grocery search unavailable, falling back to Open Food Facts:", error.message);
+      }
+    }
 
     const response = await axios.get("https://world.openfoodfacts.org/cgi/search.pl", {
       headers: { "User-Agent": userAgent },
@@ -57,6 +66,29 @@ class GroceryService {
     const products = (response.data.products || []).map(normalizeProduct).filter((product) => product.barcode && product.name !== "Unknown product");
     setCached(key, products);
     return products;
+  }
+
+  async searchIsraeliProducts(query, limit = 8) {
+    const response = await axios.post(
+      "https://api.apify.com/v2/acts/swerve~supermarket-prices/run-sync-get-dataset-items",
+      { mode: "compareProducts", productQueries: [query], oneStorePerChain: true },
+      { params: { token: process.env.APIFY_TOKEN }, timeout: 120000, maxContentLength: 8 * 1024 * 1024 }
+    );
+    const rows = Array.isArray(response.data) ? response.data : [];
+    const grouped = new Map();
+    for (const row of rows) {
+      const barcode = String(row.barcode || row.itemCode || "");
+      if (!barcode) continue;
+      const price = Number(row.price);
+      const existing = grouped.get(barcode) || { barcode, name: row.itemName || query, brand: row.manufacturer || "", quantity: [row.quantity, row.unitOfMeasure].filter(Boolean).join(" "), imageUrl: "", category: row.category || "", source: "israel_transparency", priceRows: [] };
+      if (Number.isFinite(price)) existing.priceRows.push({ price, unitPrice: row.unitPrice ? Number(row.unitPrice) : null, chain: { id: row.chainId || row.chainName, name: row.chainName }, branch: { id: row.storeId, name: row.storeName || row.storeId, city: row.city, address: row.address }, updatedAt: row.priceUpdateDate });
+      grouped.set(barcode, existing);
+    }
+    return [...grouped.values()].slice(0, Math.min(Number(limit) || 8, 12)).map(({ priceRows, ...product }) => {
+      const prices = priceRows.sort((a, b) => a.price - b.price);
+      const values = prices.map((entry) => entry.price);
+      return { ...product, pricing: { configured: true, provider: "apify", prices, summary: values.length ? { cheapest: Math.min(...values), mostExpensive: Math.max(...values), average: values.reduce((sum, value) => sum + value, 0) / values.length, storeCount: values.length, cheapestChain: prices[0]?.chain } : null } };
+    });
   }
 
   async getProduct(barcode) {
@@ -106,7 +138,7 @@ class GroceryService {
   async enrich(product, options = {}) {
     const [details, pricing] = await Promise.all([
       product.barcode ? this.getProduct(product.barcode).catch(() => product) : Promise.resolve(product),
-      product.barcode ? this.getIsraeliPrices(product.barcode, options).catch(() => ({ configured: true, prices: [], summary: null })) : Promise.resolve({ configured: false, prices: [], summary: null }),
+      options.skipPrices === "true" ? Promise.resolve(product.pricing || { configured: Boolean(process.env.APIFY_TOKEN), prices: [], summary: null }) : product.barcode ? this.getIsraeliPrices(product.barcode, options).catch(() => ({ configured: true, prices: [], summary: null })) : Promise.resolve({ configured: false, prices: [], summary: null }),
     ]);
     return { ...details, pricing };
   }
