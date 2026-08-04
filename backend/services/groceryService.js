@@ -74,15 +74,33 @@ class GroceryService {
   }
 
   async getIsraeliPrices(barcode, options = {}) {
-    if (!process.env.ISRAEL_GROCERY_API_KEY) return { configured: false, prices: [], summary: null };
-    const baseUrl = process.env.ISRAEL_GROCERY_API_URL || "https://api.cheapersal.co.il/api/v1";
-    const response = await axios.get(`${baseUrl}/products/${encodeURIComponent(barcode)}/prices`, {
-      headers: { "X-API-Key": process.env.ISRAEL_GROCERY_API_KEY },
-      timeout: 12000,
-      params: { city: options.city || undefined, radius: options.radius || undefined },
-    });
-    const data = response.data.data || response.data;
-    return { configured: true, prices: data.prices || [], summary: data.summary || null, product: data.product || null };
+    if (!process.env.APIFY_TOKEN) return { configured: false, provider: "apify", prices: [], summary: null };
+    const key = `israel-prices:${barcode}`;
+    const cached = getCached(key);
+    if (cached) return cached;
+    const response = await axios.post(
+      "https://api.apify.com/v2/acts/swerve~supermarket-prices/run-sync-get-dataset-items",
+      { mode: "compareProducts", barcodes: [String(barcode)], oneStorePerChain: true },
+      { params: { token: process.env.APIFY_TOKEN }, timeout: 120000, maxContentLength: 5 * 1024 * 1024 }
+    );
+    const rows = Array.isArray(response.data) ? response.data : [];
+    const prices = rows
+      .filter((row) => Number.isFinite(Number(row.price)))
+      .map((row) => ({
+        price: Number(row.price), unitPrice: row.unitPrice ? Number(row.unitPrice) : null,
+        chain: { id: row.chainId || row.chainName, name: row.chainName },
+        branch: { id: row.storeId, name: row.storeName || row.storeId, city: row.city, address: row.address },
+        updatedAt: row.priceUpdateDate, sourceFile: row.sourceFile,
+      }))
+      .sort((a, b) => a.price - b.price);
+    const values = prices.map((entry) => entry.price);
+    const result = {
+      configured: true, provider: "apify", prices,
+      summary: values.length ? { cheapest: Math.min(...values), mostExpensive: Math.max(...values), average: values.reduce((sum, value) => sum + value, 0) / values.length, storeCount: values.length, cheapestChain: prices[0]?.chain } : null,
+      product: rows[0] ? { barcode: String(barcode), name: rows[0].itemName, manufacturer: rows[0].manufacturer, category: rows[0].category } : null,
+    };
+    setCached(key, result);
+    return result;
   }
 
   async enrich(product, options = {}) {
