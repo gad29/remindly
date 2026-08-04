@@ -37,7 +37,7 @@ const router = createRouter({
     {
       path: '/lists/:id',
       name: 'list-detail',
-      component: () => import('@/views/ListDetailView.vue'),
+      component: () => import('@/views/TaskListView.vue'),
       meta: { requiresAuth: true }
     },
     {
@@ -48,15 +48,11 @@ const router = createRouter({
     },
     {
       path: '/tasks-lists',
-      name: 'tasks-lists',
-      component: () => import('@/views/TasksListsView.vue'),
-      meta: { requiresAuth: true }
+      redirect: '/lists'
     },
     {
       path: '/task-list/:id',
-      name: 'task-list',
-      component: () => import('@/views/TaskListView.vue'),
-      meta: { requiresAuth: true }
+      redirect: to => `/lists/${to.params.id}`
     },
     {
       path: '/shopping',

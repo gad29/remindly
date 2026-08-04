@@ -87,7 +87,7 @@ const completionRate = computed(() => taskStore.tasks.length ? Math.round(taskSt
 const focusTasks = computed(() => [...taskStore.pendingTasks].sort((a, b) => `${a.dueDate || '9999'}${a.dueTime || ''}`.localeCompare(`${b.dueDate || '9999'}${b.dueTime || ''}`)).slice(0, 5))
 const momentumMessage = computed(() => completionRate.value ? `You have completed ${completionRate.value}% of everything currently on your plate.` : 'Finish one small task to start today’s rhythm.')
 const collections = [
-  { title: 'Tasks', caption: 'Plan and finish', icon: 'mdi-check-circle-outline', to: '/tasks-lists', color: '#176b78', tint: '#dceff0' },
+  { title: 'Tasks', caption: 'Plan and finish', icon: 'mdi-check-circle-outline', to: '/lists', color: '#176b78', tint: '#dceff0' },
   { title: 'Shopping', caption: 'Buy without forgetting', icon: 'mdi-cart-outline', to: '/shopping-lists', color: '#9a5a12', tint: '#fff0dc' },
   { title: 'Appointments', caption: 'Keep every date', icon: 'mdi-calendar-blank-outline', to: '/appointment-lists', color: '#7252a3', tint: '#eee7fa' },
   { title: 'Server care', caption: 'Maintain your VPS', icon: 'mdi-server-security', to: '/server-steward', color: '#42637a', tint: '#e3edf3' }
@@ -98,7 +98,7 @@ const formatTaskTime = (task: Task) => {
   const date = new Date(`${task.dueDate}T${task.dueTime || '12:00'}`)
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', ...(task.dueTime ? { hour: 'numeric', minute: '2-digit' } : {}) }).format(date)
 }
-const openTask = (task: Task) => router.push(task.listId ? `/task-list/${task.listId}` : '/tasks')
+const openTask = (task: Task) => router.push(task.listId ? `/lists/${task.listId}` : '/tasks')
 onMounted(async () => {
   await Promise.all([
     listStore.lists.length ? Promise.resolve() : listStore.loadLists(),
