@@ -56,9 +56,7 @@ const router = createRouter({
     },
     {
       path: '/shopping',
-      name: 'shopping',
-      component: () => import('@/views/ShoppingView.vue'),
-      meta: { requiresAuth: true }
+      redirect: '/shopping-lists'
     },
     {
       path: '/shopping-lists',
@@ -86,9 +84,7 @@ const router = createRouter({
     },
     {
       path: '/appointments',
-      name: 'appointments',
-      component: () => import('@/views/AppointmentsView.vue'),
-      meta: { requiresAuth: true }
+      redirect: '/appointment-lists'
     },
     {
       path: '/appointment-lists',

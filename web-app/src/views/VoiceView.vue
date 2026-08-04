@@ -4,8 +4,9 @@
     <div class="header-section">
       <div class="header-content">
         <v-icon class="mr-2 header-icon">mdi-microphone</v-icon>
-        <h1 class="app-title">VOICE MEMOS</h1>
-        <p class="app-subtitle">Quick Thoughts, Audio Notes</p>
+        <div class="voice-kicker">VOICE NOTES</div>
+        <h1 class="app-title">Say it before it slips away</h1>
+        <p class="app-subtitle">Capture a thought, listen back, and shape it into something useful.</p>
       </div>
     </div>
 
@@ -877,48 +878,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.voice-view {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  padding: 0;
-}
+.voice-view { min-height: 100vh; padding: 0 0 96px; }
 
-.header-section {
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  padding: 2rem 1rem;
-  text-align: center;
-}
+.header-section { padding:42px 28px 20px; text-align:left; }
 
-.header-content {
-  max-width: 400px;
-  margin: 0 auto;
-}
+.header-content { max-width:1124px; margin:0 auto; }
 
-.header-icon {
-  color: white;
-  font-size: 2rem;
-}
+.header-icon { display:none; }
 
-.app-title {
-  font-size: 2.5rem;
-  font-weight: 900;
-  color: #2c3e50;
-  margin: 0.5rem 0;
-  letter-spacing: 2px;
-}
+.app-title { font-size:clamp(2.4rem,5vw,4.5rem); line-height:.96; font-weight:800; color:#173d3a; margin:0 0 14px; letter-spacing:-.055em; }
 
-.app-subtitle {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0;
-  letter-spacing: 1px;
-}
+.app-subtitle { max-width:620px; font-size:1rem; font-weight:400; color:#687572; margin:0; letter-spacing:0; }
+.voice-kicker{font:700 11px ui-monospace,monospace;letter-spacing:.14em;color:#245b55;margin-bottom:10px}
 
-.recordings-card {
-  border-radius: 16px;
-  overflow: hidden;
-}
+.recordings-card { border:1px solid #dce3df; border-radius:22px; overflow:hidden; box-shadow:none!important; }
 
 .recordings-list {
   display: flex;
@@ -931,15 +904,15 @@ onMounted(() => {
   align-items: center;
   padding: 16px;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 15px;
+  border:1px solid #e1e8e5;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: border-color .2s ease, background .2s ease;
 }
 
 .recording-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border-color:#7fa8a0;
+  background:#f8fbfa;
 }
 
 .recording-left {
@@ -953,13 +926,13 @@ onMounted(() => {
 .recording-title {
   font-size: 16px;
   font-weight: 600;
-  color: #2c3e50;
+  color: #173d3a;
   margin: 0 0 4px 0;
 }
 
 .recording-subtitle {
   font-size: 14px;
-  color: #666;
+  color: #687572;
   margin: 0;
 }
 
@@ -990,16 +963,20 @@ onMounted(() => {
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  right: auto;
+  transform:translateX(-50%);
+  width:min(560px,calc(100% - 28px));
+  bottom:16px;
   background: white;
-  border-top: 1px solid #e0e0e0;
+  border: 1px solid #dce3df;
+  border-radius:20px;
   display: flex;
   justify-content: space-around;
   align-items: center;
   padding: 8px 16px;
   z-index: 1000;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 14px 40px rgba(23,61,58,.16);
 }
 
 .nav-button {
@@ -1033,9 +1010,6 @@ onMounted(() => {
 }
 
 /* Add bottom padding to main content to account for fixed bottom nav */
-.voice-view {
-  padding-bottom: 80px;
-}
 
 /* Responsive Design */
 @media (max-width: 600px) {

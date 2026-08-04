@@ -124,6 +124,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // Serve static files (uploads)
+app.use("/uploads", express.static(path.join(process.cwd(), "backend", "uploads")));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // API routes

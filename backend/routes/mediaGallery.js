@@ -252,13 +252,17 @@ router.post(
         });
       }
 
-      const {
+      let {
         title,
         description,
         mediaType,
         tags = [],
         isPublic = false,
       } = req.body;
+
+      if (typeof tags === "string") {
+        try { tags = JSON.parse(tags); } catch { tags = tags.split(",").map((tag) => tag.trim()).filter(Boolean); }
+      }
 
       // Generate thumbnail
       const thumbnailUrl = await generateThumbnail(req.file.path, mediaType);

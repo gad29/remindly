@@ -50,7 +50,7 @@ export const useMediaGalleryStore = defineStore('mediaGallery', () => {
     
     try {
       const response = await api.get('/media-gallery')
-      mediaItems.value = response.data
+      mediaItems.value = response.data.data || response.data
     } catch (err: any) {
       error.value = err.response?.data?.message || 'Error loading media items'
       mediaItems.value = []
@@ -78,9 +78,10 @@ export const useMediaGalleryStore = defineStore('mediaGallery', () => {
         }
       })
       
-      mediaItems.value.unshift(response.data)
+      const mediaItem = response.data.data || response.data
+      mediaItems.value.unshift(mediaItem)
       
-      return { success: true, mediaItem: response.data }
+      return { success: true, mediaItem }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'Error creating media item'
       return { success: false, error: error.value }
@@ -95,12 +96,13 @@ export const useMediaGalleryStore = defineStore('mediaGallery', () => {
     
     try {
       const response = await api.put(`/media-gallery/${id}`, mediaData)
+      const mediaItem = response.data.data || response.data
       const index = mediaItems.value.findIndex(item => item.id === id)
       if (index !== -1) {
-        mediaItems.value[index] = response.data
+        mediaItems.value[index] = mediaItem
       }
       
-      return { success: true, mediaItem: response.data }
+      return { success: true, mediaItem }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'Error updating media item'
       return { success: false, error: error.value }
@@ -152,12 +154,13 @@ export const useMediaGalleryStore = defineStore('mediaGallery', () => {
     
     try {
       const response = await api.post(`/media-gallery/${id}/share`)
+      const payload = response.data.data || response.data
       const index = mediaItems.value.findIndex(item => item.id === id)
       if (index !== -1) {
-        mediaItems.value[index].shareCount = response.data.shareCount
+        mediaItems.value[index].shareCount = payload.shareCount
       }
       
-      return { success: true, shareUrl: response.data.shareUrl }
+      return { success: true, shareUrl: payload.shareUrl }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'Error sharing media item'
       return { success: false, error: error.value }

@@ -1008,51 +1008,33 @@ const shareViaWebAPI = async () => {
 </script>
 
 <style scoped>
-.shopping-list-view {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  padding: 0;
-}
+.shopping-list-view{min-height:100vh;padding:0 0 72px}
 
-.header-section {
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  padding: 2rem 1rem;
-  text-align: center;
-}
+.header-section{padding:42px 28px 20px;text-align:left}
 
-.header-content {
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
+.header-content{max-width:1124px;margin:0 auto;padding:0}
 
-.header-icon {
-  color: white;
-  font-size: 2rem;
-}
+.header-icon{color:#245b55;font-size:1.6rem}
 
 .app-title {
-  font-size: 3rem;
+  font-size: clamp(2.4rem,5vw,4.5rem);
   font-weight: 900;
-  color: #2c3e50;
+  color: #173d3a;
   margin: 0;
-  letter-spacing: 3px;
-  text-align: center;
+  letter-spacing: -.055em;
+  text-align: left;
 }
 
 .app-subtitle {
   font-size: 1.2rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: #687572;
   margin: 0;
-  letter-spacing: 2px;
-  text-align: center;
+  letter-spacing: 0;
+  text-align: left;
 }
 
-.shopping-list-card {
-  border-radius: 16px;
-  overflow: hidden;
-}
+.shopping-list-card{border:1px solid #dce3df;border-radius:22px;overflow:hidden;box-shadow:none!important}
 
 .items-list {
   margin-bottom: 2rem;
@@ -1063,8 +1045,9 @@ const shareViaWebAPI = async () => {
   align-items: center;
   padding: 16px;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 15px;
+  border:1px solid #e1e8e5;
+  box-shadow:none;
   margin-bottom: 12px;
   transition: all 0.3s ease;
 }
