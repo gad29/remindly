@@ -16,6 +16,11 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    } else {
+      // Log warning if no token is found (only in development)
+      if (import.meta.env.DEV) {
+        console.warn('No token found in localStorage. Request will fail if endpoint requires authentication.')
+      }
     }
     return config
   },
@@ -43,15 +48,15 @@ api.interceptors.response.use(
 )
 
 // API methods
-export const apiService = {
+const apiService = {
   // Auth
   auth: {
     login: (email: string, password: string) =>
       api.post<ApiResponse<{ user: any; token: string; settings: any }>>('/auth/login', { email, password }),
-    
+
     register: (userData: any) =>
       api.post<ApiResponse<{ user: any; token: string; settings: any }>>('/auth/register', userData),
-    
+
     logout: () =>
       api.post<ApiResponse<void>>('/auth/logout'),
     
@@ -203,6 +208,20 @@ export const apiService = {
     health: () => api.get<ApiResponse<any>>('/ai/health')
   },
 
+  assistant: {
+    status: () => api.get<ApiResponse<{ configured: boolean; model: string }>>('/assistant/status'),
+    preview: (text: string, language: 'he' | 'en') =>
+      api.post<ApiResponse<any>>('/assistant/preview', { text, language }),
+    apply: (actions: any[]) =>
+      api.post<ApiResponse<any[]>>('/assistant/apply', { actions })
+  },
+
+  steward: {
+    getDashboard: () => api.get<ApiResponse<any>>('/steward'),
+    updateTask: (id: string, data: any) => api.put<ApiResponse<any>>(`/steward/tasks/${id}`, data),
+    setCompleted: (id: string, completed: boolean) => api.patch<ApiResponse<any>>(`/steward/tasks/${id}/complete`, { completed })
+  },
+
   // Price Search
   prices: {
     search: (product: string, options: any = {}) =>
@@ -276,8 +295,36 @@ export const apiService = {
     
     getStats: (params: any = {}) =>
       api.get<ApiResponse<any>>('/reminders/stats/overview', { params })
+  },
+
+  // Voice Recordings
+  voiceRecordings: {
+    getAll: (params: any = {}) =>
+      api.get<ApiResponse<any>>('/voice-recordings', { params }),
+
+    getById: (id: string) =>
+      api.get<ApiResponse<any>>(`/voice-recordings/${id}`),
+
+    create: (formData: FormData) =>
+      api.post<ApiResponse<any>>('/voice-recordings', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }),
+
+    update: (id: string, data: any) =>
+      api.put<ApiResponse<any>>(`/voice-recordings/${id}`, data),
+
+    delete: (id: string) =>
+      api.delete<ApiResponse<void>>(`/voice-recordings/${id}`),
+
+    archive: (id: string, archived: boolean) =>
+      api.patch<ApiResponse<any>>(`/voice-recordings/${id}/archive`, { archived }),
+
+    process: (id: string) =>
+      api.post<ApiResponse<any>>(`/voice-recordings/${id}/process`)
   }
 }
 
-export { api }
+export { api, apiService }
 export default api

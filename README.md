@@ -436,3 +436,18 @@ flutter build ios
 [⬆ Back to Top](#-remindly---אפליקציית-ניהול-משימות-חכמה)
 
 </div>
+# OpenRouter assistant
+
+Remindly includes an optional online assistant that turns typed or browser-transcribed voice commands into proposed task changes. The assistant never applies a change until the signed-in user confirms the proposal in the UI.
+
+Configure these variables on the backend only:
+
+```env
+OPENROUTER_API_KEY=sk-or-v1-your-key
+OPENROUTER_MODEL=google/gemini-3.1-flash-lite
+APP_URL=https://your-remindly-domain.example
+```
+
+Do not use a `VITE_` prefix for the key; that would expose it to the browser bundle. The assistant sends the user's command and up to 100 recent tasks to OpenRouter to match task references. Without internet access or a configured key, normal Remindly and Server Steward features continue to work.
+
+The Server Steward page seeds a dedicated `Server maintenance` list into the existing Remindly task database. Maintenance instructions and notes are editable, while the three server profile cards remain local to the current browser and must never contain passwords or API keys.

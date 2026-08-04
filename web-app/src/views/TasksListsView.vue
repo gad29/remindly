@@ -28,24 +28,39 @@
                 </v-btn>
               </div>
 
+              <!-- Loading State -->
+              <div v-if="loading" class="text-center pa-8">
+                <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+                <p class="mt-4">Loading lists...</p>
+              </div>
+
               <!-- Lists Grid -->
-              <div v-if="toDoLists.length > 0" class="lists-grid">
+              <div v-else-if="toDoLists.length > 0" class="lists-grid">
                 <v-card
                   v-for="list in toDoLists"
                   :key="list.id"
                   class="list-item"
                   elevation="2"
-                  @click="openToDoList(list)"
                 >
                   <v-card-text class="pa-4">
                     <div class="list-header">
                       <v-icon :color="list.color" size="32" class="mr-3">{{ list.icon }}</v-icon>
-                      <div class="list-info">
+                      <div class="list-info" @click="openToDoList(list)">
                         <h3 class="list-title">{{ list.name }}</h3>
                         <p class="list-description">{{ list.description || 'No description' }}</p>
                       </div>
+                      <v-btn
+                        icon
+                        variant="text"
+                        size="small"
+                        color="error"
+                        @click.stop="deleteToDoList(list)"
+                        class="delete-button"
+                      >
+                        <v-icon>mdi-delete</v-icon>
+                      </v-btn>
                     </div>
-                    <div class="list-stats">
+                    <div class="list-stats" @click="openToDoList(list)">
                       <span class="task-count">{{ list.taskCount || 0 }} tasks</span>
                       <span class="list-date">{{ formatDate(list.updatedAt) }}</span>
                     </div>
@@ -54,7 +69,7 @@
               </div>
 
               <!-- Empty State -->
-              <div v-else class="empty-state">
+              <div v-else-if="!loading" class="empty-state">
                 <v-icon size="80" color="grey" class="mb-4">mdi-checkbox-marked-circle-outline</v-icon>
                 <h3 class="empty-title">No TO-DO Lists Yet</h3>
                 <p class="empty-description">Create your first TO-DO list to get started organizing your tasks</p>
@@ -136,12 +151,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useListStore } from '@/stores/listStore'
 
 const router = useRouter()
 const { t } = useI18n()
+const listStore = useListStore()
 
 const showCreateListDialog = ref(false)
 const createListFormValid = ref(false)
@@ -149,7 +166,7 @@ const newToDoList = ref({
   name: '',
   description: '',
   icon: 'mdi-checkbox-marked-circle-outline',
-  color: '#E91E63', // Default color for TO-DOs
+  color: '#E91E63',
 })
 
 const availableIcons = [
@@ -161,36 +178,38 @@ const availableIcons = [
   { name: 'Health', icon: 'mdi-heart-pulse', color: '#F44336' },
 ]
 
-// Mock data for now
-const toDoLists = ref([
-  {
-    id: 'todo-1',
-    name: 'Work & Personal',
-    description: 'Tasks for this week',
-    color: '#E91E63',
-    icon: 'mdi-checkbox-marked-circle-outline',
-    taskCount: 4,
-    updatedAt: new Date()
-  },
-  {
-    id: 'todo-2',
-    name: 'Project X',
-    description: 'Specific tasks for Project X',
-    color: '#2196F3',
-    icon: 'mdi-briefcase',
-    taskCount: 2,
-    updatedAt: new Date(Date.now() - 86400000) // Yesterday
-  },
-  {
-    id: 'todo-3',
-    name: 'Home Chores',
-    description: 'Things to do around the house',
-    color: '#4CAF50',
-    icon: 'mdi-home',
-    taskCount: 1,
-    updatedAt: new Date(Date.now() - 2 * 86400000) // 2 days ago
-  }
-])
+const toDoLists = computed(() => {
+  // Filter out shopping lists (mdi-cart icon) and other non-task lists
+  // Only show lists that are meant for tasks (not shopping, appointments, ideas, etc.)
+  return listStore.lists.filter(list => {
+    // Exclude shopping lists
+    if (list.icon === 'mdi-cart') return false
+    
+    // Exclude appointment lists (common icons/names)
+    const appointmentKeywords = ['appointment', 'תור', 'meeting', 'רופא', 'דוקטור', 'ביקור', 'פגישה']
+    const appointmentIcons = ['mdi-calendar', 'mdi-hospital', 'mdi-briefcase', 'mdi-account']
+    if (appointmentIcons.includes(list.icon) || 
+        appointmentKeywords.some(keyword => 
+          list.name?.toLowerCase().includes(keyword.toLowerCase())
+        )) {
+      return false
+    }
+    
+    // Exclude ideas lists (common icons/names)
+    const ideasKeywords = ['idea', 'רעיון', 'thought', 'note', 'הערה']
+    const ideasIcons = ['mdi-lightbulb', 'mdi-lightbulb-outline', 'mdi-note', 'mdi-note-text']
+    if (ideasIcons.includes(list.icon) || 
+        ideasKeywords.some(keyword => 
+          list.name?.toLowerCase().includes(keyword.toLowerCase())
+        )) {
+      return false
+    }
+    
+    // Include all other lists as task lists
+    return true
+  })
+})
+const loading = computed(() => listStore.loading)
 
 const rules = {
   required: (value: any) => !!value || 'Required field'
@@ -200,36 +219,67 @@ const openToDoList = (list: any) => {
   router.push(`/task-list/${list.id}`)
 }
 
-const saveNewToDoList = () => {
-  if (createListFormValid.value) {
-    const newList = {
-      id: `todo-${Date.now()}`,
-      name: newToDoList.value.name,
-      description: newToDoList.value.description,
-      icon: newToDoList.value.icon,
-      color: newToDoList.value.color,
-      taskCount: 0,
-      updatedAt: new Date()
-    }
-    toDoLists.value.unshift(newList)
-    showCreateListDialog.value = false
-    newToDoList.value = {
-      name: '',
-      description: '',
-      icon: 'mdi-checkbox-marked-circle-outline',
-      color: '#E91E63',
-    }
-    // Optionally navigate to the new list
-    router.push(`/task-list/${newList.id}`)
+const deleteToDoList = async (list: any) => {
+  if (!confirm(`Are you sure you want to delete "${list.name}"? This will also delete all tasks in this list.`)) {
+    return
+  }
+  
+  const result = await listStore.deleteList(list.id)
+  if (result.success) {
+    // List is already removed from store by deleteList
+  } else {
+    alert(result.error || 'Failed to delete list')
   }
 }
 
-const formatDate = (date: Date) => {
-  return date.toLocaleDateString()
+const saveNewToDoList = async () => {
+  if (createListFormValid.value) {
+    // Extract hex color from color picker (it might be an object or string)
+    let colorValue = newToDoList.value.color
+    if (typeof colorValue === 'object' && colorValue !== null) {
+      colorValue = colorValue.hex || colorValue.hexa || '#E91E63'
+    }
+    if (!colorValue || typeof colorValue !== 'string') {
+      colorValue = '#E91E63'
+    }
+    // Ensure it starts with #
+    if (!colorValue.startsWith('#')) {
+      colorValue = '#' + colorValue
+    }
+    // Ensure it's 6 hex digits
+    if (colorValue.length === 4) {
+      // Convert #RGB to #RRGGBB
+      colorValue = '#' + colorValue[1] + colorValue[1] + colorValue[2] + colorValue[2] + colorValue[3] + colorValue[3]
+    }
+    
+    const result = await listStore.createList({
+      name: newToDoList.value.name,
+      description: newToDoList.value.description,
+      icon: newToDoList.value.icon,
+      color: colorValue,
+    })
+    
+    if (result.success) {
+      showCreateListDialog.value = false
+      newToDoList.value = {
+        name: '',
+        description: '',
+        icon: 'mdi-checkbox-marked-circle-outline',
+        color: '#E91E63',
+      }
+      router.push(`/task-list/${result.list.id}`)
+    }
+  }
 }
 
-onMounted(() => {
-  // Load lists from store/API
+const formatDate = (date: string | Date) => {
+  if (!date) return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleDateString()
+}
+
+onMounted(async () => {
+  await listStore.loadLists()
 })
 </script>
 
@@ -313,10 +363,18 @@ onMounted(() => {
   display: flex;
   align-items: center;
   margin-bottom: 1rem;
+  position: relative;
 }
 
 .list-info {
   flex: 1;
+  cursor: pointer;
+}
+
+.delete-button {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .list-title {
@@ -338,6 +396,7 @@ onMounted(() => {
   align-items: center;
   font-size: 0.8rem;
   color: #999;
+  cursor: pointer;
 }
 
 .empty-state {

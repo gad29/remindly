@@ -155,6 +155,18 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/assistant',
+      name: 'assistant',
+      component: () => import('@/views/AssistantView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/server-steward',
+      name: 'server-steward',
+      component: () => import('@/views/ServerStewardView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/media-gallery',
       name: 'media-gallery',
       component: () => import('@/views/MediaGalleryView.vue'),

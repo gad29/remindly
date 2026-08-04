@@ -67,49 +67,6 @@ router.get("/", protect, async (req, res) => {
   }
 });
 
-// @desc    Get tasks by list
-// @route   GET /api/lists/:listId/tasks
-// @access  Private
-router.get("/lists/:listId/tasks", protect, async (req, res) => {
-  try {
-    const { listId } = req.params;
-
-    // Verify list belongs to user
-    const list = await List.findOne({
-      where: {
-        id: listId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!list) {
-      return res.status(404).json({
-        success: false,
-        error: "List not found",
-      });
-    }
-
-    const tasks = await Task.findAll({
-      where: { listId },
-      order: [
-        ["position", "ASC"],
-        ["createdAt", "DESC"],
-      ],
-    });
-
-    res.json({
-      success: true,
-      data: tasks,
-    });
-  } catch (error) {
-    console.error("Get tasks by list error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Server error",
-    });
-  }
-});
-
 // @desc    Get single task
 // @route   GET /api/tasks/:id
 // @access  Private
@@ -249,9 +206,15 @@ router.post(
       });
     } catch (error) {
       console.error("Create task error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
       res.status(500).json({
         success: false,
-        error: "Server error",
+        error: error.message || "Server error",
+        details: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
     }
   }

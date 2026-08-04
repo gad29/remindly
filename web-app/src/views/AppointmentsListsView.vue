@@ -35,18 +35,27 @@
                   :key="list.id"
                   class="list-item"
                   elevation="2"
-                  @click="openAppointmentList(list)"
                 >
                   <v-card-text class="pa-4">
                     <div class="list-header">
                       <v-icon :color="list.color" size="32" class="mr-3">{{ list.icon }}</v-icon>
-                      <div class="list-info">
+                      <div class="list-info" @click="openAppointmentList(list)">
                         <h3 class="list-title">{{ list.name }}</h3>
                         <p class="list-description">{{ list.description || 'No description' }}</p>
                       </div>
+                      <v-btn
+                        icon
+                        variant="text"
+                        size="small"
+                        color="error"
+                        @click.stop="deleteAppointmentList(list)"
+                        class="delete-button"
+                      >
+                        <v-icon>mdi-delete</v-icon>
+                      </v-btn>
                     </div>
-                    <div class="list-stats">
-                      <span class="appointment-count">{{ list.appointmentCount || 0 }} appointments</span>
+                    <div class="list-stats" @click="openAppointmentList(list)">
+                      <span class="appointment-count">{{ list.taskCount || 0 }} appointments</span>
                       <span class="list-date">{{ formatDate(list.updatedAt) }}</span>
                     </div>
                   </v-card-text>
@@ -133,12 +142,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useListStore } from '@/stores/listStore'
 
 const router = useRouter()
 const { t } = useI18n()
+const listStore = useListStore()
 
 const showCreateListDialog = ref(false)
 const createListFormValid = ref(false)
@@ -165,66 +176,147 @@ const availableIcons = [
   { title: 'Sport', value: 'mdi-dumbbell' },
 ]
 
-// Mock data for now
-const appointmentLists = ref([
-  {
-    id: '1',
-    name: 'Work Meetings',
-    description: 'All work-related appointments and meetings',
-    color: 'blue',
-    icon: 'mdi-briefcase',
-    appointmentCount: 3,
-    updatedAt: new Date()
-  },
-  {
-    id: '2',
-    name: 'Personal Appointments',
-    description: 'Dentist, Doctor, Hairdresser, etc.',
-    color: 'green',
-    icon: 'mdi-hospital',
-    appointmentCount: 2,
-    updatedAt: new Date()
-  },
-  {
-    id: '3',
-    name: 'Family Events',
-    description: 'Birthdays, gatherings, school events',
-    color: 'orange',
-    icon: 'mdi-account-group',
-    appointmentCount: 4,
-    updatedAt: new Date()
-  }
-])
+// Get appointment lists from store (filter by name containing appointment-related keywords or calendar/hospital icons)
+const appointmentLists = computed(() => {
+  return listStore.lists.filter(list => {
+    const name = list.name.toLowerCase()
+    const icon = (list.icon || '').toLowerCase()
+    
+    // Check if name contains appointment-related keywords
+    const hasAppointmentKeyword = 
+      name.includes('appointment') || 
+      name.includes('תור') ||
+      name.includes('meeting') ||
+      name.includes('רופא') ||
+      name.includes('דוקטור') ||
+      name.includes('ביקור') ||
+      name.includes('פגישה')
+    
+    // Check if icon is appointment-related
+    const hasAppointmentIcon = 
+      icon.includes('calendar') ||
+      icon.includes('hospital') ||
+      icon.includes('briefcase') ||
+      icon.includes('account')
+    
+    return hasAppointmentKeyword || hasAppointmentIcon
+  })
+})
 
 const openAppointmentList = (list: any) => {
   router.push(`/appointment-list/${list.id}`)
 }
 
-const saveNewAppointmentList = () => {
-  if (createListFormValid.value) {
-    const newList = {
-      id: Date.now().toString(),
-      name: newAppointmentList.value.name,
-      description: newAppointmentList.value.description,
-      color: newAppointmentList.value.color,
-      icon: newAppointmentList.value.icon,
-      appointmentCount: 0,
-      updatedAt: new Date(),
-    }
-    appointmentLists.value.push(newList)
-    showCreateListDialog.value = false
-    newAppointmentList.value = { name: '', description: '', icon: 'mdi-calendar', color: '#4CAF50' }
+const deleteAppointmentList = async (list: any) => {
+  if (!confirm(`Are you sure you want to delete "${list.name}"? This will also delete all appointments in this list.`)) {
+    return
+  }
+  
+  const result = await listStore.deleteList(list.id)
+  if (result.success) {
+    // List is already removed from store by deleteList
+  } else {
+    alert(result.error || 'Failed to delete list')
   }
 }
 
-const formatDate = (date: Date) => {
-  return date.toLocaleDateString()
+const saveNewAppointmentList = async () => {
+  if (!createListFormValid.value) return
+  
+  // Extract hex color from color picker (it might be an object or string)
+  let colorValue = newAppointmentList.value.color
+  console.log('Original color value:', colorValue, 'Type:', typeof colorValue)
+  
+  if (typeof colorValue === 'object' && colorValue !== null) {
+    colorValue = colorValue.hex || colorValue.hexa || colorValue.rgba || '#4CAF50'
+    console.log('Extracted color from object:', colorValue)
+  }
+  
+  if (!colorValue || typeof colorValue !== 'string') {
+    colorValue = '#4CAF50'
+    console.log('Using default color:', colorValue)
+  }
+  
+  // Ensure it starts with #
+  if (!colorValue.startsWith('#')) {
+    colorValue = '#' + colorValue
+  }
+  
+  // Ensure it's 6 hex digits (remove alpha if present)
+  if (colorValue.length > 7) {
+    colorValue = colorValue.substring(0, 7)
+  }
+  if (colorValue.length === 4) {
+    // Convert #RGB to #RRGGBB
+    colorValue = '#' + colorValue[1] + colorValue[1] + colorValue[2] + colorValue[2] + colorValue[3] + colorValue[3]
+  }
+  
+  // Final validation - must be #RRGGBB format
+  if (!/^#[0-9A-F]{6}$/i.test(colorValue)) {
+    console.warn('Invalid color format, using default:', colorValue)
+    colorValue = '#4CAF50'
+  }
+  
+  console.log('Final color value:', colorValue)
+  
+  const listData = {
+    name: newAppointmentList.value.name.trim(),
+    description: (newAppointmentList.value.description || '').trim(),
+    icon: newAppointmentList.value.icon || 'mdi-calendar',
+    color: colorValue,
+  }
+  
+  console.log('Sending list data:', listData)
+  
+  const result = await listStore.createList(listData)
+  
+  if (result.success) {
+    showCreateListDialog.value = false
+    newAppointmentList.value = { name: '', description: '', icon: 'mdi-calendar', color: '#4CAF50' }
+    // Reload lists to show the new one
+    await loadAppointmentLists()
+    if (result.list) {
+      router.push(`/appointment-list/${result.list.id}`)
+    }
+  } else {
+    const errorMsg = result.error || 'Failed to create appointment list'
+    
+    // If list already exists, find it and offer to open it
+    if (errorMsg.includes('already exists') || errorMsg.includes('קיים')) {
+      // Reload lists to make sure we have the latest data
+      await loadAppointmentLists()
+      
+      const existingList = listStore.lists.find(l => 
+        l.name.toLowerCase().trim() === listData.name.toLowerCase().trim()
+      )
+      
+      if (existingList) {
+        const openExisting = confirm(
+          `רשימה בשם "${listData.name}" כבר קיימת.\n\nהאם תרצה לפתוח את הרשימה הקיימת?`
+        )
+        if (openExisting) {
+          router.push(`/appointment-list/${existingList.id}`)
+        }
+      } else {
+        alert(errorMsg + '\n\nאנא נסה שם אחר או מחק את הרשימה הקיימת.')
+      }
+    } else {
+      const details = result.details ? '\n\nDetails: ' + JSON.stringify(result.details, null, 2) : ''
+      alert(errorMsg + details)
+    }
+    console.error('Failed to create appointment list:', result)
+  }
+}
+
+const formatDate = (date: Date | string | undefined) => {
+  if (!date) return 'N/A'
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleDateString()
 }
 
 const loadAppointmentLists = async () => {
   try {
-    // TODO: Implement API call to load appointment lists
-    console.log('Loading appointment lists...')
+    await listStore.loadLists()
   } catch (error) {
     console.error('Error loading appointment lists:', error)
   }
@@ -315,10 +407,18 @@ onMounted(() => {
   display: flex;
   align-items: center;
   margin-bottom: 1rem;
+  position: relative;
 }
 
 .list-info {
   flex: 1;
+  cursor: pointer;
+}
+
+.delete-button {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .list-title {
@@ -340,6 +440,7 @@ onMounted(() => {
   align-items: center;
   font-size: 0.8rem;
   color: #999;
+  cursor: pointer;
 }
 
 .empty-state {

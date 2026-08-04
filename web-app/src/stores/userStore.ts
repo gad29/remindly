@@ -22,11 +22,20 @@ export const useUserStore = defineStore('user', () => {
     
     try {
       const response = await api.post('/auth/login', { email, password })
-      user.value = response.data.user
-      settings.value = response.data.settings
+      
+      // Backend returns: { success: true, user: ..., settings: ..., token: ... }
+      const responseData = response.data
+      user.value = responseData.user || responseData.data?.user
+      settings.value = responseData.settings || responseData.data?.settings
       
       // Store token
-      localStorage.setItem('token', response.data.token)
+      const token = responseData.token || responseData.data?.token
+      if (token) {
+        localStorage.setItem('token', token)
+      } else {
+        console.error('No token received from login response:', responseData)
+        throw new Error('No token received from server')
+      }
       
       return { success: true }
     } catch (err: any) {
@@ -48,11 +57,20 @@ export const useUserStore = defineStore('user', () => {
     
     try {
       const response = await api.post('/auth/register', userData)
-      user.value = response.data.user
-      settings.value = response.data.settings
+      
+      // Backend returns: { success: true, user: ..., settings: ..., token: ... }
+      const responseData = response.data
+      user.value = responseData.user || responseData.data?.user
+      settings.value = responseData.settings || responseData.data?.settings
       
       // Store token
-      localStorage.setItem('token', response.data.token)
+      const token = responseData.token || responseData.data?.token
+      if (token) {
+        localStorage.setItem('token', token)
+      } else {
+        console.error('No token received from register response:', responseData)
+        throw new Error('No token received from server')
+      }
       
       return { success: true }
     } catch (err: any) {
@@ -91,8 +109,11 @@ export const useUserStore = defineStore('user', () => {
     
     try {
       const response = await api.get('/auth/me')
-      user.value = response.data.user
-      settings.value = response.data.settings
+      
+      // Backend returns: { success: true, user: ..., settings: ... }
+      const responseData = response.data
+      user.value = responseData.user || responseData.data?.user
+      settings.value = responseData.settings || responseData.data?.settings
     } catch (err: any) {
       error.value = err.response?.data?.message || 'שגיאה בטעינת המשתמש'
       localStorage.removeItem('token')

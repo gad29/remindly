@@ -11,18 +11,16 @@ export const useListStore = defineStore('list', () => {
 
   // Getters
   const listsByType = computed(() => {
-    const categorized = {
-      tasks: lists.value.find(l => l.name === 'משימות') || null,
-      shopping: lists.value.find(l => l.name === 'קניות') || null,
-      calls: lists.value.find(l => l.name === 'שיחות טלפון') || null,
-      meetings: lists.value.find(l => l.name === 'פגישות') || null,
-      appointments: lists.value.find(l => l.name === 'תורים') || null,
-      repairs: lists.value.find(l => l.name === 'תיקונים') || null,
-      custom: lists.value.filter(l => 
-        !['משימות', 'קניות', 'שיחות טלפון', 'פגישות', 'תורים', 'תיקונים'].includes(l.name)
-      )
+    // Return all lists as custom - no default categorization
+    return {
+      tasks: null,
+      shopping: null,
+      calls: null,
+      meetings: null,
+      appointments: null,
+      repairs: null,
+      custom: lists.value
     }
-    return categorized
   })
 
   const getListById = computed(() => (id: string) => 
@@ -43,7 +41,7 @@ export const useListStore = defineStore('list', () => {
     
     try {
       const response = await api.get('/lists')
-      lists.value = response.data
+      lists.value = response.data.data || response.data
     } catch (err: any) {
       error.value = err.response?.data?.message || 'שגיאה בטעינת הרשימות'
       // Clear lists on error
@@ -58,13 +56,20 @@ export const useListStore = defineStore('list', () => {
     error.value = null
     
     try {
+      console.log('Creating list with data:', listData)
       const response = await api.post('/lists', listData)
-      lists.value.push(response.data)
+      const newList = response.data.data || response.data
+      lists.value.push(newList)
       
-      return { success: true, list: response.data }
+      return { success: true, list: newList }
     } catch (err: any) {
-      error.value = err.response?.data?.message || 'שגיאה ביצירת הרשימה'
-      return { success: false, error: error.value }
+      console.error('Error creating list:', err)
+      console.error('Error response:', err.response?.data)
+      error.value = err.response?.data?.error || err.response?.data?.message || 'שגיאה ביצירת הרשימה'
+      if (err.response?.data?.details) {
+        console.error('Validation errors:', err.response.data.details)
+      }
+      return { success: false, error: error.value, details: err.response?.data?.details }
     } finally {
       loading.value = false
     }
@@ -76,12 +81,13 @@ export const useListStore = defineStore('list', () => {
     
     try {
       const response = await api.put(`/lists/${id}`, listData)
+      const updatedList = response.data.data || response.data
       const index = lists.value.findIndex(list => list.id === id)
       if (index !== -1) {
-        lists.value[index] = response.data
+        lists.value[index] = updatedList
       }
       
-      return { success: true, list: response.data }
+      return { success: true, list: updatedList }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'שגיאה בעדכון הרשימה'
       return { success: false, error: error.value }
@@ -129,67 +135,6 @@ export const useListStore = defineStore('list', () => {
     }
   }
 
-  const createDefaultLists = async () => {
-    const defaultLists = [
-      {
-        name: 'משימות',
-        description: 'משימות כלליות',
-        icon: 'mdi-format-list-checks',
-        color: '#1976d2'
-      },
-      {
-        name: 'קניות',
-        description: 'רשימת מוצרים לקנייה',
-        icon: 'mdi-cart',
-        color: '#4caf50'
-      },
-      {
-        name: 'שיחות טלפון',
-        description: 'אנשים להתקשר אליהם',
-        icon: 'mdi-phone',
-        color: '#ff9800'
-      },
-      {
-        name: 'פגישות',
-        description: 'פגישות ואירועים',
-        icon: 'mdi-calendar',
-        color: '#9c27b0'
-      },
-      {
-        name: 'תורים',
-        description: 'תורים לרופאים וטיפולים',
-        icon: 'mdi-hospital',
-        color: '#f44336'
-      },
-      {
-        name: 'תיקונים',
-        description: 'דברים שצריך לתקן',
-        icon: 'mdi-wrench',
-        color: '#607d8b'
-      }
-    ]
-
-    loading.value = true
-    error.value = null
-    
-    try {
-      const promises = defaultLists.map(listData => 
-        api.post('/lists', listData)
-      )
-      
-      const responses = await Promise.all(promises)
-      const newLists = responses.map(response => response.data)
-      
-      lists.value = [...lists.value, ...newLists]
-      
-      return { success: true, lists: newLists }
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'שגיאה ביצירת הרשימות המוגדרות'
-      return { success: false, error: error.value }
-    } finally {
-      loading.value = false
-    }
-  }
 
   const searchLists = async (query: string) => {
     loading.value = true
@@ -197,7 +142,7 @@ export const useListStore = defineStore('list', () => {
     
     try {
       const response = await api.get(`/lists/search?q=${encodeURIComponent(query)}`)
-      return { success: true, results: response.data }
+      return { success: true, results: response.data.data || response.data }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'שגיאה בחיפוש רשימות'
       return { success: false, error: error.value }
@@ -226,7 +171,6 @@ export const useListStore = defineStore('list', () => {
     updateList,
     deleteList,
     reorderLists,
-    createDefaultLists,
     searchLists,
     clearError
   }

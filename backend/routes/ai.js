@@ -20,7 +20,10 @@ router.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const { text, language = "he" } = req.body;
@@ -29,8 +32,8 @@ router.post(
 
       res.json({
         success: true,
+        data: results,
         message: "Text processed successfully",
-        results,
       });
     } catch (error) {
       console.error("AI processing error:", error);
@@ -59,7 +62,10 @@ router.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const { text, fromLang, toLang } = req.body;
@@ -67,7 +73,9 @@ router.post(
       if (fromLang === toLang) {
         return res.json({
           success: true,
-          translatedText: text,
+          data: {
+            translatedText: text,
+          },
         });
       }
 
@@ -79,7 +87,9 @@ router.post(
 
       res.json({
         success: true,
-        translatedText,
+        data: {
+          translatedText,
+        },
       });
     } catch (error) {
       console.error("Translation error:", error);
@@ -148,7 +158,9 @@ router.get("/suggestions", auth, async (req, res) => {
 
     res.json({
       success: true,
-      suggestions: typeSuggestions,
+      data: {
+        suggestions: typeSuggestions,
+      },
     });
   } catch (error) {
     console.error("Error fetching suggestions:", error);
@@ -169,11 +181,13 @@ router.get("/history", auth, async (req, res) => {
     // For now, return empty results
     res.json({
       success: true,
-      history: [],
-      total: 0,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: 0,
+      data: {
+        history: [],
+        total: 0,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: 0,
+      },
     });
   } catch (error) {
     console.error("Error fetching AI history:", error);
@@ -193,8 +207,10 @@ router.get("/health", auth, async (req, res) => {
 
     res.json({
       success: true,
-      message: "AI service is healthy",
-      timestamp: new Date().toISOString(),
+      data: {
+        message: "AI service is healthy",
+        timestamp: new Date().toISOString(),
+      },
     });
   } catch (error) {
     console.error("AI service health check failed:", error);

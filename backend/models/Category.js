@@ -78,19 +78,19 @@ const Category = sequelize.define(
     tableName: "categories",
     indexes: [
       {
-        fields: ["parentId"],
+        fields: ["parent_id"],
       },
       {
         fields: ["level"],
       },
       {
-        fields: ["isActive"],
+        fields: ["is_active"],
       },
       {
-        fields: ["isSystem"],
+        fields: ["is_system"],
       },
       {
-        fields: ["usageCount"],
+        fields: ["usage_count"],
       },
       {
         fields: ["position"],

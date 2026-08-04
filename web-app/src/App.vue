@@ -40,7 +40,7 @@
           <!-- Right side - Action buttons -->
           <v-col cols="auto" class="d-flex align-center">
             <!-- Home Button -->
-            <v-btn icon variant="text" @click="$router.push('/')" class="action-btn"
+            <v-btn icon variant="text" @click="goHome" class="action-btn"
               :title="userStore.userLanguage === 'he' ? 'דף הבית' : 'Home'">
               <v-icon size="20">mdi-home</v-icon>
             </v-btn>
@@ -231,6 +231,18 @@ const navigationItems = computed(() => [
     to: '/tasks'
   },
   {
+    title: userStore.userLanguage === 'he' ? 'עוזר קולי' : 'AI assistant',
+    subtitle: userStore.userLanguage === 'he' ? 'דיבור למשימות' : 'Voice to tasks',
+    icon: 'mdi-waveform',
+    to: '/assistant'
+  },
+  {
+    title: userStore.userLanguage === 'he' ? 'תחזוקת שרתים' : 'Server Steward',
+    subtitle: userStore.userLanguage === 'he' ? 'שגרת CloudPanel ו-Coolify' : 'CloudPanel & Coolify routine',
+    icon: 'mdi-server-security',
+    to: '/server-steward'
+  },
+  {
     title: 'רשימת קניות',
     subtitle: 'מוצרים לקנייה',
     icon: 'mdi-cart',
@@ -265,14 +277,30 @@ const navigationItems = computed(() => [
 const availableLists = computed(() => listStore.lists)
 
 // Methods
+const goHome = () => {
+  try {
+    router.push('/').catch(err => {
+      // Ignore navigation errors (e.g., already on home page)
+      if (err.name !== 'NavigationDuplicated') {
+        console.error('Navigation error:', err)
+      }
+    })
+  } catch (err) {
+    console.error('Error navigating home:', err)
+    // Fallback: reload page
+    window.location.href = '/'
+  }
+}
+
 const handleSearch = () => {
   // Implement search functionality
   console.log('Searching for:', searchQuery.value)
 }
 
 const startVoiceRecording = () => {
-  // Navigate to voice memos page instead of showing dialog
-  router.push('/voice')
+  // The primary microphone opens the safe preview/confirm assistant.
+  // Existing saved recordings remain available at /voice.
+  router.push('/assistant')
 }
 
 const toggleRecording = () => {

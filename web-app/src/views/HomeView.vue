@@ -207,10 +207,7 @@ const completedTasksCount = computed(() => taskStore.completedTasks.length)
 const overdueTasksCount = computed(() => taskStore.overdueTasks.length)
 const listsCount = computed(() => lists.value.length)
 
-const defaultLists = computed(() => {
-  const defaultListNames = ['משימות', 'קניות', 'שיחות טלפון', 'פגישות', 'תורים', 'תיקונים']
-  return lists.value.filter(list => defaultListNames.includes(list.name))
-})
+// No default lists - user creates their own
 
 const availableLists = computed(() =>
   lists.value.map(list => ({

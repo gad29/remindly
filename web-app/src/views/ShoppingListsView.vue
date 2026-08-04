@@ -28,26 +28,46 @@
                 </v-btn>
               </div>
 
+              <!-- Loading State -->
+              <div v-if="loading" class="text-center pa-8">
+                <v-progress-circular indeterminate color="primary"></v-progress-circular>
+                <p class="mt-4">Loading shopping lists...</p>
+              </div>
+
+              <!-- Error State -->
+              <div v-else-if="error" class="text-center pa-8">
+                <v-alert type="error" :text="error"></v-alert>
+              </div>
+
               <!-- Shopping Lists Grid -->
-              <div v-if="shoppingLists.length > 0" class="lists-grid">
+              <div v-else-if="shoppingLists.length > 0" class="lists-grid">
                 <v-card
                   v-for="list in shoppingLists"
                   :key="list.id"
                   class="shopping-list-item"
                   elevation="2"
-                  @click="openShoppingList(list)"
                 >
                   <v-card-text class="pa-4">
                     <div class="list-header">
                       <v-icon color="primary" size="32" class="mr-3">mdi-cart</v-icon>
-                      <div class="list-info">
+                      <div class="list-info" @click="openShoppingList(list)">
                         <h3 class="list-title">{{ list.name }}</h3>
                         <p class="list-description">{{ list.description || 'Shopping list' }}</p>
                       </div>
+                      <v-btn
+                        icon
+                        variant="text"
+                        size="small"
+                        color="error"
+                        @click.stop="deleteShoppingList(list)"
+                        class="delete-button"
+                      >
+                        <v-icon>mdi-delete</v-icon>
+                      </v-btn>
                     </div>
-                    <div class="list-stats">
-                      <span class="item-count">{{ list.itemCount || 0 }} items</span>
-                      <span class="list-date">{{ formatDate(list.updatedAt) }}</span>
+                    <div class="list-stats" @click="openShoppingList(list)">
+                      <span class="item-count">{{ list.taskCount || list.completedCount || 0 }} items</span>
+                      <span class="list-date">{{ formatDate(list.updatedAt || list.created_at || list.createdAt) }}</span>
                     </div>
                   </v-card-text>
                 </v-card>
@@ -79,6 +99,11 @@
       <v-card>
         <v-card-title>Create New Shopping List</v-card-title>
         <v-card-text>
+          <!-- Error Message -->
+          <v-alert v-if="error && showCreateListDialog" type="error" class="mb-4" dismissible @click:close="error = null">
+            {{ error }}
+          </v-alert>
+          
           <v-form ref="createForm" v-model="formValid">
             <v-text-field
               v-model="newList.name"
@@ -113,45 +138,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useListStore } from '@/stores/listStore'
+import { apiService } from '@/utils/api'
 
 const router = useRouter()
+const listStore = useListStore()
 
 // Reactive data
 const showCreateListDialog = ref(false)
 const formValid = ref(false)
 const creating = ref(false)
+const loading = ref(false)
+const error = ref<string | null>(null)
 
 const newList = reactive({
   name: '',
   description: ''
 })
 
-// Mock data for now
-const shoppingLists = ref([
-  {
-    id: '1',
-    name: 'Weekly Groceries',
-    description: 'Grocery Store, This Week',
-    itemCount: 7,
-    updatedAt: new Date()
-  },
-  {
-    id: '2',
-    name: 'Party Supplies',
-    description: 'Birthday party shopping',
-    itemCount: 12,
-    updatedAt: new Date()
-  },
-  {
-    id: '3',
-    name: 'Office Supplies',
-    description: 'Work essentials',
-    itemCount: 5,
-    updatedAt: new Date()
-  }
-])
+// Get shopping lists from store (filter by name containing "shopping" or use all lists)
+const shoppingLists = computed(() => {
+  return listStore.lists.filter(list => {
+    // Filter by icon (mdi-cart indicates shopping list)
+    if (list.icon === 'mdi-cart') return true
+    
+    // Filter by name keywords
+    const name = list.name.toLowerCase()
+    if (name.includes('shopping') || name.includes('קניות')) return true
+    
+    return false
+  })
+})
 
 // Validation rules
 const rules = {
@@ -163,28 +182,126 @@ const openShoppingList = (list: any) => {
   router.push(`/shopping-list/${list.id}`)
 }
 
+const deleteShoppingList = async (list: any) => {
+  if (!confirm(`Are you sure you want to delete "${list.name}"? This will also delete all items in this list.`)) {
+    return
+  }
+  
+  const result = await listStore.deleteList(list.id)
+  if (result.success) {
+    // List is already removed from store by deleteList
+  } else {
+    alert(result.error || 'Failed to delete list')
+  }
+}
+
 const createShoppingList = async () => {
   if (!formValid.value) return
   
   creating.value = true
+  error.value = null
   try {
-    const list = {
-      id: Date.now().toString(),
-      ...newList,
-      itemCount: 0,
-      updatedAt: new Date()
+    const result = await listStore.createList({
+      name: newList.name,
+      description: newList.description || '',
+      icon: 'mdi-cart',
+      color: '#4CAF50'
+    })
+    
+    if (result.success) {
+      showCreateListDialog.value = false
+      
+      // Reset form
+      newList.name = ''
+      newList.description = ''
+      
+      // Reload lists to ensure the new list appears
+      await loadShoppingLists()
+      
+      // Navigate to the new list
+      if (result.list) {
+        router.push(`/shopping-list/${result.list.id}`)
+      }
+    } else {
+      // Check if error is "List with this name already exists"
+      if (result.error && result.error.includes('already exists')) {
+        // Try to find the existing list
+        await loadShoppingLists()
+        const existingList = shoppingLists.value.find(
+          list => list.name.toLowerCase() === newList.name.toLowerCase()
+        )
+        
+        if (existingList) {
+          // Offer to open the existing list
+          if (confirm(`A shopping list named "${newList.name}" already exists. Would you like to open it?`)) {
+            showCreateListDialog.value = false
+            newList.name = ''
+            newList.description = ''
+            router.push(`/shopping-list/${existingList.id}`)
+          } else {
+            error.value = `A list named "${newList.name}" already exists. Please choose a different name.`
+          }
+        } else {
+          error.value = result.error || 'Failed to create shopping list'
+        }
+      } else {
+        error.value = result.error || 'Failed to create shopping list'
+      }
     }
+  } catch (err: any) {
+    console.error('Error creating shopping list:', err)
+    const errorMessage = err.response?.data?.error || 'Failed to create shopping list'
     
-    shoppingLists.value.unshift(list)
-    showCreateListDialog.value = false
-    
-    // Reset form
-    newList.name = ''
-    newList.description = ''
-  } catch (error) {
-    console.error('Error creating shopping list:', error)
+    // Check if error is "List with this name already exists"
+    if (errorMessage.includes('already exists')) {
+      // Try to find the existing list
+      await loadShoppingLists()
+      const existingList = shoppingLists.value.find(
+        list => list.name.toLowerCase() === newList.name.toLowerCase()
+      )
+      
+      if (existingList) {
+        // Offer to open the existing list
+        if (confirm(`A shopping list named "${newList.name}" already exists. Would you like to open it?`)) {
+          showCreateListDialog.value = false
+          newList.name = ''
+          newList.description = ''
+          router.push(`/shopping-list/${existingList.id}`)
+        } else {
+          error.value = `A list named "${newList.name}" already exists. Please choose a different name.`
+        }
+      } else {
+        error.value = errorMessage
+      }
+    } else {
+      error.value = errorMessage
+    }
   } finally {
     creating.value = false
+  }
+}
+
+const loadShoppingLists = async () => {
+  loading.value = true
+  error.value = null
+  try {
+    await listStore.loadLists()
+  } catch (err: any) {
+    console.error('Error loading shopping lists:', err)
+    error.value = err.response?.data?.error || 'Failed to load shopping lists'
+  } finally {
+    loading.value = false
+  }
+}
+
+const getItemCount = async (listId: string) => {
+  try {
+    const response = await apiService.shoppingItems.getAll({ listId })
+    const data = response.data
+    return data.items?.length || data.length || 0
+  } catch (err) {
+    console.error('Error getting item count:', err)
+    return 0
   }
 }
 
@@ -194,13 +311,14 @@ const cancelCreateList = () => {
   newList.description = ''
 }
 
-const formatDate = (date: Date) => {
-  return date.toLocaleDateString()
+const formatDate = (date: Date | string | undefined) => {
+  if (!date) return 'N/A'
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleDateString()
 }
 
 onMounted(() => {
-  // Load shopping lists
-  console.log('Loading shopping lists...')
+  loadShoppingLists()
 })
 </script>
 
@@ -284,10 +402,18 @@ onMounted(() => {
   display: flex;
   align-items: center;
   margin-bottom: 1rem;
+  position: relative;
 }
 
 .list-info {
   flex: 1;
+  cursor: pointer;
+}
+
+.delete-button {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .list-title {
@@ -309,6 +435,7 @@ onMounted(() => {
   align-items: center;
   font-size: 0.8rem;
   color: #999;
+  cursor: pointer;
 }
 
 .empty-state {

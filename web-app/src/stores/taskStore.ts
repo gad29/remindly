@@ -69,7 +69,7 @@ export const useTaskStore = defineStore('task', () => {
     
     try {
       const response = await api.get('/tasks')
-      tasks.value = response.data
+      tasks.value = response.data.data || response.data
     } catch (err: any) {
       error.value = err.response?.data?.message || 'שגיאה בטעינת המשימות'
       // Clear tasks on error
@@ -85,7 +85,7 @@ export const useTaskStore = defineStore('task', () => {
     
     try {
       const response = await api.get(`/lists/${listId}/tasks`)
-      const listTasks = response.data
+      const listTasks = response.data.data || response.data
       
       // Update tasks in store
       tasks.value = tasks.value.filter(task => task.listId !== listId)
@@ -106,9 +106,10 @@ export const useTaskStore = defineStore('task', () => {
     
     try {
       const response = await api.post('/tasks', taskData)
-      tasks.value.push(response.data)
+      const newTask = response.data.data || response.data
+      tasks.value.push(newTask)
       
-      return { success: true, task: response.data }
+      return { success: true, task: newTask }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'שגיאה ביצירת המשימה'
       return { success: false, error: error.value }
@@ -123,12 +124,13 @@ export const useTaskStore = defineStore('task', () => {
     
     try {
       const response = await api.put(`/tasks/${id}`, taskData)
+      const updatedTask = response.data.data || response.data
       const index = tasks.value.findIndex(task => task.id === id)
       if (index !== -1) {
-        tasks.value[index] = response.data
+        tasks.value[index] = updatedTask
       }
       
-      return { success: true, task: response.data }
+      return { success: true, task: updatedTask }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'שגיאה בעדכון המשימה'
       return { success: false, error: error.value }
@@ -166,12 +168,13 @@ export const useTaskStore = defineStore('task', () => {
         completed: !task.completed
       })
       
+      const updatedTask = response.data.data || response.data
       const index = tasks.value.findIndex(t => t.id === id)
       if (index !== -1) {
-        tasks.value[index] = response.data
+        tasks.value[index] = updatedTask
       }
       
-      return { success: true, task: response.data }
+      return { success: true, task: updatedTask }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'שגיאה בעדכון סטטוס המשימה'
       return { success: false, error: error.value }
@@ -214,9 +217,10 @@ export const useTaskStore = defineStore('task', () => {
     
     try {
       const response = await api.get(`/tasks/search?q=${encodeURIComponent(query)}`)
-      searchResults.value = response.data
+      const results = response.data.data || response.data
+      searchResults.value = results
       
-      return { success: true, results: response.data }
+      return { success: true, results }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'שגיאה בחיפוש משימות'
       return { success: false, error: error.value }

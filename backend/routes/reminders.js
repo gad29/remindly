@@ -52,15 +52,21 @@ router.get("/", auth, async (req, res) => {
     });
 
     res.json({
-      reminders: reminders.rows,
-      total: reminders.count,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(reminders.count / limit),
+      success: true,
+      data: {
+        reminders: reminders.rows,
+        total: reminders.count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(reminders.count / limit),
+      },
     });
   } catch (error) {
     console.error("Error fetching reminders:", error);
-    res.status(500).json({ error: "Failed to fetch reminders" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch reminders",
+    });
   }
 });
 
@@ -87,13 +93,22 @@ router.get("/:id", auth, async (req, res) => {
     });
 
     if (!reminder) {
-      return res.status(404).json({ error: "Reminder not found" });
+      return res.status(404).json({
+        success: false,
+        error: "Reminder not found",
+      });
     }
 
-    res.json(reminder);
+    res.json({
+      success: true,
+      data: reminder,
+    });
   } catch (error) {
     console.error("Error fetching reminder:", error);
-    res.status(500).json({ error: "Failed to fetch reminder" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch reminder",
+    });
   }
 });
 
@@ -118,7 +133,10 @@ router.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const {
@@ -139,7 +157,10 @@ router.post(
       });
 
       if (!task) {
-        return res.status(404).json({ error: "Task not found" });
+        return res.status(404).json({
+          success: false,
+          error: "Task not found",
+        });
       }
 
       const reminder = await Reminder.create({
@@ -152,10 +173,16 @@ router.post(
         metadata,
       });
 
-      res.status(201).json(reminder);
+      res.status(201).json({
+        success: true,
+        data: reminder,
+      });
     } catch (error) {
       console.error("Error creating reminder:", error);
-      res.status(500).json({ error: "Failed to create reminder" });
+      res.status(500).json({
+        success: false,
+        error: "Failed to create reminder",
+      });
     }
   }
 );
@@ -186,7 +213,10 @@ router.put(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const reminder = await Reminder.findOne({
@@ -197,18 +227,30 @@ router.put(
       });
 
       if (!reminder) {
-        return res.status(404).json({ error: "Reminder not found" });
+        return res.status(404).json({
+          success: false,
+          error: "Reminder not found",
+        });
       }
 
       if (reminder.sent) {
-        return res.status(400).json({ error: "Cannot update sent reminder" });
+        return res.status(400).json({
+          success: false,
+          error: "Cannot update sent reminder",
+        });
       }
 
       const updatedReminder = await reminder.update(req.body);
-      res.json(updatedReminder);
+      res.json({
+        success: true,
+        data: updatedReminder,
+      });
     } catch (error) {
       console.error("Error updating reminder:", error);
-      res.status(500).json({ error: "Failed to update reminder" });
+      res.status(500).json({
+        success: false,
+        error: "Failed to update reminder",
+      });
     }
   }
 );
@@ -224,14 +266,23 @@ router.delete("/:id", auth, async (req, res) => {
     });
 
     if (!reminder) {
-      return res.status(404).json({ error: "Reminder not found" });
+      return res.status(404).json({
+        success: false,
+        error: "Reminder not found",
+      });
     }
 
     await reminder.destroy();
-    res.json({ message: "Reminder deleted successfully" });
+    res.json({
+      success: true,
+      message: "Reminder deleted successfully",
+    });
   } catch (error) {
     console.error("Error deleting reminder:", error);
-    res.status(500).json({ error: "Failed to delete reminder" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete reminder",
+    });
   }
 });
 
@@ -252,11 +303,17 @@ router.post("/:id/send", auth, async (req, res) => {
     });
 
     if (!reminder) {
-      return res.status(404).json({ error: "Reminder not found" });
+      return res.status(404).json({
+        success: false,
+        error: "Reminder not found",
+      });
     }
 
     if (reminder.sent) {
-      return res.status(400).json({ error: "Reminder already sent" });
+      return res.status(400).json({
+        success: false,
+        error: "Reminder already sent",
+      });
     }
 
     await notificationService.sendReminder(reminder);
@@ -266,10 +323,16 @@ router.post("/:id/send", auth, async (req, res) => {
       deliveryStatus: "sent",
     });
 
-    res.json({ message: "Reminder sent successfully" });
+    res.json({
+      success: true,
+      message: "Reminder sent successfully",
+    });
   } catch (error) {
     console.error("Error sending reminder:", error);
-    res.status(500).json({ error: "Failed to send reminder" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to send reminder",
+    });
   }
 });
 
@@ -287,10 +350,16 @@ router.get("/stats/overview", auth, async (req, res) => {
       start,
       end
     );
-    res.json(stats);
+    res.json({
+      success: true,
+      data: stats,
+    });
   } catch (error) {
     console.error("Error fetching reminder stats:", error);
-    res.status(500).json({ error: "Failed to fetch reminder statistics" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch reminder statistics",
+    });
   }
 });
 

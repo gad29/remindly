@@ -85,19 +85,19 @@ const Reminder = sequelize.define(
     tableName: "reminders",
     indexes: [
       {
-        fields: ["reminderTime"],
+        fields: ["reminder_time"],
       },
       {
-        fields: ["userId"],
+        fields: ["user_id"],
       },
       {
-        fields: ["taskId"],
+        fields: ["task_id"],
       },
       {
         fields: ["sent"],
       },
       {
-        fields: ["reminderType"],
+        fields: ["reminder_type"],
       },
     ],
   }

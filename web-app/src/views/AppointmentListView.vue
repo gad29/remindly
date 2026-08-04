@@ -15,8 +15,19 @@
         <v-col cols="12">
           <v-card class="appointment-list-card" elevation="4">
             <v-card-text class="pa-6">
+              <!-- Error Message -->
+              <v-alert v-if="error && !loading" type="error" class="mb-4" dismissible @click:close="error = null">
+                {{ error }}
+              </v-alert>
+
+              <!-- Loading State -->
+              <div v-if="loading" class="text-center pa-8">
+                <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+                <p class="mt-4">Loading appointments...</p>
+              </div>
+
               <!-- Appointments List -->
-              <div v-if="appointments.length > 0" class="appointments-list">
+              <div v-else-if="appointments.length > 0" class="appointments-list">
                 <div
                   v-for="appointment in appointments"
                   :key="appointment.id"
@@ -63,26 +74,81 @@
                 <h3 class="empty-title">No appointments scheduled yet</h3>
                 <p class="empty-description">Add your first appointment to this list</p>
               </div>
+
+              <!-- Action Buttons Section -->
+              <div class="add-item-section">
+                <div class="action-buttons-row">
+                  <v-btn
+                    color="primary"
+                    size="large"
+                    @click="showAddAppointmentDialog = true"
+                    class="add-item-button"
+                  >
+                    <v-icon start>mdi-plus</v-icon>
+                    Add Appointment
+                  </v-btn>
+                  
+                  <v-btn
+                    color="secondary"
+                    size="large"
+                    @click="printOrSavePDF"
+                    class="action-button"
+                    :disabled="appointments.length === 0"
+                  >
+                    <v-icon start>mdi-printer</v-icon>
+                    Save/Print PDF
+                  </v-btn>
+                  
+                  <v-menu>
+                    <template v-slot:activator="{ props }">
+                      <v-btn
+                        color="success"
+                        size="large"
+                        v-bind="props"
+                        class="action-button"
+                        :disabled="appointments.length === 0"
+                      >
+                        <v-icon start>mdi-share-variant</v-icon>
+                        Share
+                      </v-btn>
+                    </template>
+                    <v-list>
+                      <v-list-item @click="shareViaWhatsApp">
+                        <v-list-item-title>
+                          <v-icon class="mr-2">mdi-whatsapp</v-icon>
+                          WhatsApp
+                        </v-list-item-title>
+                      </v-list-item>
+                      <v-list-item @click="shareViaSMS">
+                        <v-list-item-title>
+                          <v-icon class="mr-2">mdi-message-text</v-icon>
+                          SMS
+                        </v-list-item-title>
+                      </v-list-item>
+                      <v-list-item @click="shareViaEmail">
+                        <v-list-item-title>
+                          <v-icon class="mr-2">mdi-email</v-icon>
+                          Email
+                        </v-list-item-title>
+                      </v-list-item>
+                      <v-list-item @click="copyShareLink">
+                        <v-list-item-title>
+                          <v-icon class="mr-2">mdi-link</v-icon>
+                          Copy Link
+                        </v-list-item-title>
+                      </v-list-item>
+                      <v-list-item v-if="canUseWebShare" @click="shareViaWebAPI">
+                        <v-list-item-title>
+                          <v-icon class="mr-2">mdi-share</v-icon>
+                          More Options
+                        </v-list-item-title>
+                      </v-list-item>
+                    </v-list>
+                  </v-menu>
+                </div>
+              </div>
             </v-card-text>
           </v-card>
-        </v-col>
-      </v-row>
-
-      <!-- Add Appointment Button -->
-      <v-row class="mt-4">
-        <v-col cols="12">
-          <v-btn
-            color="primary"
-            size="large"
-            block
-            rounded
-            elevation="8"
-            class="add-appointment-button"
-            @click="showAddAppointmentDialog = true"
-          >
-            <v-icon start>mdi-plus</v-icon>
-            Add New Appointment
-          </v-btn>
         </v-col>
       </v-row>
     </v-container>
@@ -106,23 +172,82 @@
               rows="3"
               class="mb-4"
             />
-            <v-text-field
-              v-model="currentAppointment.date"
-              label="Date (e.g., Mon, June 10)"
-              :rules="[rules.required]"
-              required
-              class="mb-4"
-            />
-            <v-text-field
-              v-model="currentAppointment.time"
-              label="Time (e.g., 10:00 AM)"
-              :rules="[rules.required]"
-              required
-              class="mb-4"
-            />
+            <v-menu
+              v-model="dateMenu"
+              :close-on-content-click="false"
+              transition="scale-transition"
+              offset-y
+              min-width="auto"
+            >
+              <template v-slot:activator="{ props }">
+                <v-text-field
+                  v-model="currentAppointment.date"
+                  label="Date"
+                  :rules="[rules.required]"
+                  required
+                  readonly
+                  v-bind="props"
+                  prepend-inner-icon="mdi-calendar"
+                  class="mb-4"
+                />
+              </template>
+              <v-date-picker
+                v-model="currentAppointment.date"
+                @update:model-value="dateMenu = false"
+              />
+            </v-menu>
+            <v-menu
+              v-model="timeMenu"
+              :close-on-content-click="false"
+              transition="scale-transition"
+              offset-y
+              min-width="auto"
+            >
+              <template v-slot:activator="{ props }">
+                <v-text-field
+                  v-model="currentAppointment.time"
+                  label="Time"
+                  :rules="[rules.required]"
+                  required
+                  readonly
+                  v-bind="props"
+                  prepend-inner-icon="mdi-clock-outline"
+                  class="mb-4"
+                />
+              </template>
+              <v-time-picker
+                v-model="currentAppointment.time"
+                format="24hr"
+                @update:model-value="timeMenu = false"
+              />
+            </v-menu>
             <v-checkbox
               v-model="currentAppointment.isCompleted"
               label="Completed"
+              class="mb-4"
+            />
+            <v-divider class="my-4"></v-divider>
+            <v-checkbox
+              v-model="currentAppointment.hasReminder"
+              label="Enable Reminder"
+              class="mb-4"
+            />
+            <v-select
+              v-if="currentAppointment.hasReminder"
+              v-model="currentAppointment.reminderBefore"
+              :items="reminderOptions"
+              label="Remind me"
+              item-title="label"
+              item-value="value"
+              class="mb-4"
+            />
+            <v-select
+              v-if="currentAppointment.hasReminder"
+              v-model="currentAppointment.reminderType"
+              :items="reminderTypes"
+              label="Reminder Type"
+              item-title="label"
+              item-value="value"
               class="mb-4"
             />
           </v-form>
@@ -140,18 +265,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useListStore } from '@/stores/listStore'
+import { useTaskStore } from '@/stores/taskStore'
+import { apiService } from '@/utils/api'
 
 const route = useRoute()
-const { t } = useI18n()
+const router = useRouter()
+const listStore = useListStore()
+const taskStore = useTaskStore()
 
-const appointmentListId = computed(() => route.params.id as string)
+// Helper function to check if string is a valid UUID
+const isValidUUID = (str: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(str)
+}
+
+const appointmentListId = computed(() => {
+  const id = route.params.id as string
+  if (!isValidUUID(id)) {
+    return null
+  }
+  return id
+})
+
+const loading = ref(false)
+const error = ref<string | null>(null)
 
 const showAddAppointmentDialog = ref(false)
 const appointmentFormValid = ref(false)
 const isEditing = ref(false)
+const dateMenu = ref(false)
+const timeMenu = ref(false)
 
 const currentAppointment = ref({
   id: '',
@@ -160,62 +306,64 @@ const currentAppointment = ref({
   date: '',
   time: '',
   isCompleted: false,
+  hasReminder: false,
+  reminderBefore: 15, // minutes before appointment
+  reminderType: 'push', // push, sms, email, call
 })
 
 const rules = {
   required: (value: any) => !!value || 'Required field',
 }
 
-// Mock data for the specific appointment list
-const appointmentList = ref({
-  id: appointmentListId.value,
-  name: 'Work Meetings',
-  description: 'All work-related appointments and meetings',
-  color: 'blue',
-  icon: 'mdi-briefcase',
-  appointmentCount: 3,
-  updatedAt: new Date()
+const reminderOptions = [
+  { label: '5 minutes before', value: 5 },
+  { label: '15 minutes before', value: 15 },
+  { label: '30 minutes before', value: 30 },
+  { label: '1 hour before', value: 60 },
+  { label: '2 hours before', value: 120 },
+  { label: '1 day before', value: 1440 },
+  { label: '2 days before', value: 2880 },
+]
+
+const reminderTypes = [
+  { label: 'Push Notification', value: 'push' },
+  { label: 'SMS', value: 'sms' },
+  { label: 'Email', value: 'email' },
+  { label: 'Phone Call', value: 'call' },
+]
+
+// Appointment list and tasks (appointments are stored as tasks)
+const appointmentList = computed(() => {
+  if (!appointmentListId.value) return null
+  return listStore.getListById(appointmentListId.value) || null
 })
 
-const appointments = ref([
-  {
-    id: 'a1',
-    title: 'Dentist Check-up',
-    subtitle: 'Mon, June 10, 10:00 AM',
-    date: 'Mon, June 10',
-    time: '10:00 AM',
-    isCompleted: true,
-  },
-  {
-    id: 'a2',
-    title: 'Project Meeting',
-    subtitle: '12:00 AM',
-    date: 'Mon, June 10',
-    time: '12:00 AM',
-    isCompleted: false,
-  },
-  {
-    id: 'a3',
-    title: 'Project Meeting',
-    subtitle: 'Thu, June 13, 6:00 PM',
-    date: 'Thu, June 13',
-    time: '6:00 PM',
-    isCompleted: false,
-  },
-  {
-    id: 'a4',
-    title: 'Yoga Class',
-    subtitle: 'Spinach',
-    date: 'Fri, June 14',
-    time: '7:00 PM',
-    isCompleted: false,
-  },
-])
+const appointments = computed(() => {
+  if (!appointmentListId.value) return []
+  const tasks = taskStore.getTasksByListId(appointmentListId.value)
+  // Convert tasks to appointments format
+  return tasks.map(task => ({
+    id: task.id,
+    title: task.title,
+    subtitle: task.description || `${task.dueDate || ''} ${task.dueTime || ''}`.trim(),
+    date: task.dueDate || '',
+    time: task.dueTime || '',
+    isCompleted: task.completed || false,
+  }))
+})
 
-const toggleAppointmentCompletion = (appointment: any) => {
-  appointment.isCompleted = !appointment.isCompleted
-  // TODO: Call API to update completion status
-  console.log(`Appointment ${appointment.id} completion toggled to ${appointment.isCompleted}`)
+const toggleAppointmentCompletion = async (appointment: any) => {
+  if (!appointmentListId.value) {
+    error.value = 'Invalid list ID. Cannot toggle appointment.'
+    return
+  }
+  try {
+    await taskStore.toggleTaskCompletion(appointment.id)
+    error.value = null
+  } catch (err: any) {
+    error.value = err.response?.data?.error || 'Failed to toggle appointment'
+    console.error('Error toggling appointment:', err)
+  }
 }
 
 const addAppointment = () => {
@@ -227,6 +375,9 @@ const addAppointment = () => {
     date: '',
     time: '',
     isCompleted: false,
+    hasReminder: false,
+    reminderBefore: 15,
+    reminderType: 'push',
   }
   showAddAppointmentDialog.value = true
 }
@@ -237,31 +388,136 @@ const editAppointment = (appointment: any) => {
   showAddAppointmentDialog.value = true
 }
 
-const saveAppointment = () => {
-  if (appointmentFormValid.value) {
-    if (isEditing.value) {
-      const index = appointments.value.findIndex(a => a.id === currentAppointment.value.id)
-      if (index !== -1) {
-        appointments.value[index] = { ...currentAppointment.value }
+const saveAppointment = async () => {
+  if (!appointmentFormValid.value) {
+    error.value = 'Please fill in all required fields'
+    return
+  }
+
+  if (!appointmentListId.value) {
+    error.value = 'Invalid list ID. Please create a new appointment list.'
+    return
+  }
+
+  try {
+    // Format date to YYYY-MM-DD if needed
+    let formattedDate = currentAppointment.value.date
+    if (formattedDate) {
+      // Convert to string if it's a Date object
+      if (formattedDate instanceof Date) {
+        formattedDate = formattedDate.toISOString().split('T')[0]
+      } else if (typeof formattedDate === 'string') {
+        if (formattedDate.includes('T')) {
+          formattedDate = formattedDate.split('T')[0]
+        }
+      } else {
+        formattedDate = String(formattedDate)
       }
     } else {
-      const newId = Date.now().toString()
-      appointments.value.push({ ...currentAppointment.value, id: newId })
+      error.value = 'Date is required'
+      return
     }
+    
+    // Format time to HH:MM if needed
+    let formattedTime = currentAppointment.value.time
+    if (formattedTime) {
+      // Convert to string if it's a Date object or other type
+      if (formattedTime instanceof Date) {
+        const hours = String(formattedTime.getHours()).padStart(2, '0')
+        const minutes = String(formattedTime.getMinutes()).padStart(2, '0')
+        formattedTime = `${hours}:${minutes}`
+      } else if (typeof formattedTime === 'string') {
+        if (formattedTime.includes('T')) {
+          formattedTime = formattedTime.split('T')[1]?.substring(0, 5) || formattedTime
+        }
+        // Ensure format is HH:MM
+        if (formattedTime.length === 5 && formattedTime.includes(':')) {
+          // Already in correct format
+        } else if (formattedTime.length === 4) {
+          // Format like "1430" to "14:30"
+          formattedTime = `${formattedTime.substring(0, 2)}:${formattedTime.substring(2, 4)}`
+        }
+      } else {
+        formattedTime = String(formattedTime)
+      }
+    } else {
+      error.value = 'Time is required'
+      return
+    }
+    
+    let taskId: string
+    
+    if (isEditing.value) {
+      await taskStore.updateTask(currentAppointment.value.id, {
+        title: currentAppointment.value.title,
+        description: currentAppointment.value.subtitle,
+        dueDate: formattedDate,
+        dueTime: formattedTime,
+        completed: currentAppointment.value.isCompleted,
+      })
+      taskId = currentAppointment.value.id
+    } else {
+      const result = await taskStore.addTask({
+        title: currentAppointment.value.title,
+        description: currentAppointment.value.subtitle,
+        listId: appointmentListId.value,
+        dueDate: formattedDate,
+        dueTime: formattedTime,
+        completed: currentAppointment.value.isCompleted,
+      })
+      taskId = result.task?.id || ''
+    }
+    
+    // Create reminder if enabled
+    if (currentAppointment.value.hasReminder && taskId && formattedDate && formattedTime) {
+      try {
+        // Calculate reminder time (appointment time minus reminderBefore minutes)
+        const appointmentDateTime = new Date(`${formattedDate}T${formattedTime}`)
+        const reminderTime = new Date(appointmentDateTime.getTime() - (currentAppointment.value.reminderBefore * 60 * 1000))
+        
+        // Only create reminder if reminder time is in the future
+        if (reminderTime > new Date()) {
+          await apiService.reminders.create({
+            taskId: taskId,
+            reminderTime: reminderTime.toISOString(),
+            reminderType: currentAppointment.value.reminderType || 'push',
+            title: `Reminder: ${currentAppointment.value.title}`,
+            message: `You have an appointment: ${currentAppointment.value.title} at ${formattedTime} on ${formattedDate}`,
+          })
+        }
+      } catch (reminderErr: any) {
+        console.warn('Failed to create reminder:', reminderErr)
+        // Don't fail the whole operation if reminder creation fails
+      }
+    }
+    
+    error.value = null
+    dateMenu.value = false
+    timeMenu.value = false
     cancelAppointmentDialog()
+  } catch (err: any) {
+    error.value = err.response?.data?.error || 'Failed to save appointment'
+    console.error('Error saving appointment:', err)
   }
 }
 
-const deleteAppointment = (appointment: any) => {
-  const index = appointments.value.findIndex(a => a.id === appointment.id)
-  if (index > -1) {
-    appointments.value.splice(index, 1)
+const deleteAppointment = async (appointment: any) => {
+  if (!confirm(`Are you sure you want to delete "${appointment.title}"?`)) return
+  
+  try {
+    await taskStore.deleteTask(appointment.id)
+    error.value = null
+  } catch (err: any) {
+    error.value = err.response?.data?.error || 'Failed to delete appointment'
+    console.error('Error deleting appointment:', err)
   }
 }
 
 const cancelAppointmentDialog = () => {
   showAddAppointmentDialog.value = false
   isEditing.value = false
+  dateMenu.value = false
+  timeMenu.value = false
   currentAppointment.value = {
     id: '',
     title: '',
@@ -269,14 +525,270 @@ const cancelAppointmentDialog = () => {
     date: '',
     time: '',
     isCompleted: false,
+    hasReminder: false,
+    reminderBefore: 15,
+    reminderType: 'push',
+  }
+  error.value = null
+}
+
+const loadAppointmentList = async () => {
+  const id = route.params.id as string
+  
+  // Check if the ID is a valid UUID
+  if (!isValidUUID(id)) {
+    error.value = `Invalid list ID format. Please create a new appointment list from the appointment lists page.`
+    // Redirect to appointment lists page after 3 seconds
+    setTimeout(() => {
+      router.push('/appointment-lists')
+    }, 3000)
+    return
+  }
+
+  loading.value = true
+  error.value = null
+  
+  try {
+    await listStore.loadLists()
+    await taskStore.loadTasksByList(id)
+  } catch (err: any) {
+    console.error('Error loading appointment list:', err)
+    error.value = err.response?.data?.error || 'Failed to load appointment list'
+  } finally {
+    loading.value = false
   }
 }
 
 onMounted(() => {
-  // In a real app, fetch appointment list details and its appointments based on appointmentListId
-  console.log(`Loading appointments for list: ${appointmentListId.value}`)
-  // For now, mock data is used.
+  loadAppointmentList()
 })
+
+// Watch for route changes to reload data if list ID changes
+watch(
+  () => route.params.id,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      loadAppointmentList()
+    }
+  }
+)
+
+// Share and Print functionality
+const canUseWebShare = computed(() => {
+  return typeof navigator !== 'undefined' && 'share' in navigator
+})
+
+const generateAppointmentListText = () => {
+  const listName = appointmentList.value?.name || 'Appointment List'
+  const description = appointmentList.value?.description || ''
+  let text = `📅 ${listName}\n`
+  if (description) {
+    text += `${description}\n\n`
+  }
+  text += 'Appointments:\n'
+  appointments.value.forEach((appointment) => {
+    const checkbox = appointment.isCompleted ? '✅' : '☐'
+    text += `${checkbox} ${appointment.title}`
+    if (appointment.subtitle) {
+      text += ` - ${appointment.subtitle}`
+    }
+    text += '\n'
+  })
+  return text
+}
+
+const printOrSavePDF = () => {
+  const listName = appointmentList.value?.name || 'Appointment List'
+  const description = appointmentList.value?.description || ''
+  
+  // Create a hidden iframe for printing
+  const iframe = document.createElement('iframe')
+  iframe.style.position = 'fixed'
+  iframe.style.right = '0'
+  iframe.style.bottom = '0'
+  iframe.style.width = '0'
+  iframe.style.height = '0'
+  iframe.style.border = '0'
+  document.body.appendChild(iframe)
+  
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+  
+  if (!iframeDoc) {
+    error.value = 'Failed to create print window. Please try again.'
+    document.body.removeChild(iframe)
+    return
+  }
+  
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${listName}</title>
+      <meta charset="UTF-8">
+      <style>
+        @media print {
+          @page {
+            margin: 1cm;
+          }
+        }
+        body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          max-width: 800px;
+          margin: 0 auto;
+        }
+        h1 {
+          color: #2c3e50;
+          border-bottom: 3px solid #1976d2;
+          padding-bottom: 10px;
+        }
+        .description {
+          color: #666;
+          margin-bottom: 20px;
+          font-style: italic;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 20px;
+        }
+        th {
+          background-color: #1976d2;
+          color: white;
+          padding: 12px;
+          text-align: left;
+        }
+        td {
+          padding: 10px;
+          border-bottom: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+          background-color: #f5f5f5;
+        }
+        .completed {
+          text-decoration: line-through;
+          color: #999;
+        }
+        .checkbox {
+          font-size: 18px;
+          margin-right: 10px;
+        }
+      </style>
+    </head>
+    <body>
+      <div style="text-align: center; margin-bottom: 20px; padding: 10px; background-color: #f5f5f5; border-radius: 8px;">
+        <h2 style="margin: 0; color: #1976d2; font-size: 1.5rem; font-weight: 600;">רשימת תורים / Appointment List</h2>
+      </div>
+      <h1>${listName}</h1>
+      ${description ? `<p class="description">${description}</p>` : ''}
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Appointment</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${appointments.value.map(appointment => `
+            <tr class="${appointment.isCompleted ? 'completed' : ''}">
+              <td><span class="checkbox">${appointment.isCompleted ? '✅' : '☐'}</span></td>
+              <td>${appointment.title || '-'}</td>
+              <td>${appointment.subtitle || '-'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <p style="margin-top: 30px; color: #666; font-size: 12px;">
+        Generated from Remindly on ${new Date().toLocaleString()}
+      </p>
+    </body>
+    </html>
+  `
+  
+  iframeDoc.open()
+  iframeDoc.write(htmlContent)
+  iframeDoc.close()
+  
+  // Wait for content to load, then print
+  iframe.onload = () => {
+    setTimeout(() => {
+      iframe.contentWindow?.focus()
+      iframe.contentWindow?.print()
+      setTimeout(() => {
+        document.body.removeChild(iframe)
+      }, 1000)
+    }, 250)
+  }
+  
+  // Fallback if onload doesn't fire
+  setTimeout(() => {
+    if (iframe.contentWindow) {
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe)
+        }
+      }, 1000)
+    }
+  }, 500)
+}
+
+const shareViaWhatsApp = () => {
+  const text = generateAppointmentListText()
+  const encodedText = encodeURIComponent(text)
+  const url = `https://wa.me/?text=${encodedText}`
+  window.open(url, '_blank')
+}
+
+const shareViaSMS = () => {
+  const text = generateAppointmentListText()
+  const encodedText = encodeURIComponent(text)
+  const url = `sms:?body=${encodedText}`
+  window.location.href = url
+}
+
+const shareViaEmail = () => {
+  const subject = encodeURIComponent(appointmentList.value?.name || 'Appointment List')
+  const body = encodeURIComponent(generateAppointmentListText())
+  const url = `mailto:?subject=${subject}&body=${body}`
+  window.location.href = url
+}
+
+const copyShareLink = async () => {
+  const listId = route.params.id
+  const shareUrl = `${window.location.origin}/appointment-list/${listId}`
+  
+  try {
+    await navigator.clipboard.writeText(shareUrl)
+    alert('Link copied to clipboard!')
+  } catch (err) {
+    console.error('Failed to copy link:', err)
+    error.value = 'Failed to copy link. Please copy manually: ' + shareUrl
+  }
+}
+
+const shareViaWebAPI = async () => {
+  if (!canUseWebShare.value) return
+  
+  const text = generateAppointmentListText()
+  const listId = route.params.id
+  const shareUrl = `${window.location.origin}/appointment-list/${listId}`
+  
+  try {
+    await navigator.share({
+      title: appointmentList.value?.name || 'Appointment List',
+      text: text,
+      url: shareUrl
+    })
+  } catch (err: any) {
+    if (err.name !== 'AbortError') {
+      console.error('Error sharing:', err)
+      error.value = 'Failed to share. Please try another method.'
+    }
+  }
+}
 </script>
 
 <style scoped>
@@ -384,19 +896,42 @@ onMounted(() => {
   gap: 4px;
 }
 
-.add-appointment-button {
+.add-item-section {
+  text-align: center;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 1rem;
+}
+
+.action-buttons-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.add-item-button,
+.action-button {
   font-size: 1.1rem;
   font-weight: 600;
   padding: 12px 32px;
   text-transform: none;
   letter-spacing: 1px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+  min-width: 160px;
 }
 
-.add-appointment-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+@media (max-width: 600px) {
+  .action-buttons-row {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .add-item-button,
+  .action-button {
+    width: 100%;
+    max-width: 300px;
+  }
 }
 
 .empty-state {

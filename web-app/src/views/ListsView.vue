@@ -27,24 +27,39 @@
                   Create New List
                 </v-btn>
               </div>
+              <!-- Loading State -->
+              <div v-if="loading" class="text-center pa-8">
+                <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+                <p class="mt-4">Loading lists...</p>
+              </div>
+
               <!-- Lists Grid -->
-              <div v-if="lists.length > 0" class="lists-grid">
+              <div v-else-if="lists.length > 0" class="lists-grid">
                 <v-card
                   v-for="list in lists"
                   :key="list.id"
                   class="list-item"
                   elevation="2"
-                  @click="openList(list)"
                 >
                   <v-card-text class="pa-4">
                     <div class="list-header">
                       <v-icon :color="list.color" size="32" class="mr-3">{{ list.icon }}</v-icon>
-                      <div class="list-info">
+                      <div class="list-info" @click="openList(list)">
                         <h3 class="list-title">{{ list.name }}</h3>
                         <p class="list-description">{{ list.description || 'No description' }}</p>
                       </div>
+                      <v-btn
+                        icon
+                        variant="text"
+                        size="small"
+                        color="error"
+                        @click.stop="deleteList(list)"
+                        class="delete-button"
+                      >
+                        <v-icon>mdi-delete</v-icon>
+                      </v-btn>
                     </div>
-                    <div class="list-stats">
+                    <div class="list-stats" @click="openList(list)">
                       <span class="task-count">{{ list.taskCount || 0 }} tasks</span>
                       <span class="list-date">{{ formatDate(list.updatedAt) }}</span>
                     </div>
@@ -53,7 +68,7 @@
               </div>
 
               <!-- Empty State -->
-              <div v-else class="empty-state">
+              <div v-else-if="!loading" class="empty-state">
                 <v-icon size="80" color="grey" class="mb-4">mdi-format-list-bulleted</v-icon>
                 <h3 class="empty-title">No Lists Yet</h3>
                 <p class="empty-description">Create your first list to get started organizing your tasks</p>
@@ -76,43 +91,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useListStore } from '@/stores/listStore'
 
 const router = useRouter()
 const { t } = useI18n()
+const listStore = useListStore()
 
-// Mock data for now
-const lists = ref([
-  {
-    id: '1',
-    name: 'Work Tasks',
-    description: 'Important work-related tasks',
-    color: 'blue',
-    icon: 'mdi-briefcase',
-    taskCount: 5,
-    updatedAt: new Date()
-  },
-  {
-    id: '2',
-    name: 'Personal',
-    description: 'Personal tasks and reminders',
-    color: 'green',
-    icon: 'mdi-account',
-    taskCount: 3,
-    updatedAt: new Date()
-  },
-  {
-    id: '3',
-    name: 'Shopping',
-    description: 'Grocery and shopping list',
-    color: 'orange',
-    icon: 'mdi-cart',
-    taskCount: 8,
-    updatedAt: new Date()
-  }
-])
+const lists = computed(() => listStore.lists)
+const loading = computed(() => listStore.loading)
 
 const createList = () => {
   router.push('/lists/new')
@@ -122,21 +111,27 @@ const openList = (list: any) => {
   router.push(`/lists/${list.id}`)
 }
 
-const formatDate = (date: Date) => {
-  return date.toLocaleDateString()
-}
-
-const loadLists = async () => {
-  try {
-    // TODO: Implement API call to load lists
-    console.log('Loading lists...')
-  } catch (error) {
-    console.error('Error loading lists:', error)
+const deleteList = async (list: any) => {
+  if (!confirm(`Are you sure you want to delete "${list.name}"? This will also delete all tasks in this list.`)) {
+    return
+  }
+  
+  const result = await listStore.deleteList(list.id)
+  if (result.success) {
+    // List is already removed from store by deleteList
+  } else {
+    alert(result.error || 'Failed to delete list')
   }
 }
 
-onMounted(() => {
-  loadLists()
+const formatDate = (date: string | Date) => {
+  if (!date) return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleDateString()
+}
+
+onMounted(async () => {
+  await listStore.loadLists()
 })
 </script>
 
@@ -220,11 +215,20 @@ onMounted(() => {
   display: flex;
   align-items: center;
   margin-bottom: 1rem;
+  position: relative;
 }
 
 .list-info {
   flex: 1;
+  cursor: pointer;
 }
+
+.delete-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
 
 .list-title {
   font-size: 1.2rem;
@@ -245,6 +249,7 @@ onMounted(() => {
   align-items: center;
   font-size: 0.8rem;
   color: #999;
+  cursor: pointer;
 }
 
 .empty-state {

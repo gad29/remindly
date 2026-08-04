@@ -22,6 +22,7 @@ router.get("/", auth, async (req, res) => {
       whereClause.listId = listId;
     }
 
+    // Note: category is a string field, not categoryId
     if (category) {
       whereClause.category = category;
     }
@@ -30,36 +31,74 @@ router.get("/", auth, async (req, res) => {
       whereClause.checked = checked === "true";
     }
 
-    const items = await ShoppingItem.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: List,
-          as: "list",
-        },
-        {
-          model: Category,
-          as: "categoryInfo",
-        },
-      ],
-      order: [
-        ["position", "ASC"],
-        ["createdAt", "DESC"],
-      ],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-    });
+    // Try to fetch items without includes first to avoid association errors
+    let items;
+    try {
+      items = await ShoppingItem.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: List,
+            as: "list",
+            required: false,
+          },
+          {
+            model: Category,
+            as: "categoryInfo",
+            required: false,
+          },
+        ],
+        order: [
+          ["position", "ASC"],
+          ["createdAt", "DESC"],
+        ],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+      });
+    } catch (includeError) {
+      // If include fails, try without includes
+      console.warn("Include failed, trying without associations:", includeError.message);
+      items = await ShoppingItem.findAndCountAll({
+        where: whereClause,
+        order: [
+          ["position", "ASC"],
+          ["createdAt", "DESC"],
+        ],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+      });
+    }
 
     res.json({
-      items: items.rows,
-      total: items.count,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(items.count / limit),
+      success: true,
+      data: {
+        items: items.rows,
+        total: items.count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(items.count / limit),
+      },
     });
   } catch (error) {
     console.error("Error fetching shopping items:", error);
-    res.status(500).json({ error: "Failed to fetch shopping items" });
+    console.error("Error details:", {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      original: error.original?.message,
+      stack: error.stack
+    });
+    
+    // Check if it's a table doesn't exist error
+    if (error.message?.includes('does not exist') || error.original?.message?.includes('does not exist')) {
+      console.error("⚠️  Shopping items table might not exist. Run: npm run db:fix");
+    }
+    
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch shopping items",
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
   }
 });
 
@@ -84,13 +123,22 @@ router.get("/:id", auth, async (req, res) => {
     });
 
     if (!item) {
-      return res.status(404).json({ error: "Shopping item not found" });
+      return res.status(404).json({
+        success: false,
+        error: "Shopping item not found",
+      });
     }
 
-    res.json(item);
+    res.json({
+      success: true,
+      data: item,
+    });
   } catch (error) {
     console.error("Error fetching shopping item:", error);
-    res.status(500).json({ error: "Failed to fetch shopping item" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch shopping item",
+    });
   }
 });
 
@@ -99,7 +147,17 @@ router.post(
   "/",
   auth,
   [
-    body("listId").isUUID().withMessage("Valid list ID is required"),
+    body("listId")
+      .notEmpty()
+      .withMessage("List ID is required")
+      .custom((value) => {
+        // Accept UUID or numeric string (for backward compatibility)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(value) || /^\d+$/.test(value)) {
+          return true;
+        }
+        throw new Error("Invalid list ID format");
+      }),
     body("productName")
       .isLength({ min: 1, max: 255 })
       .withMessage("Product name is required"),
@@ -121,7 +179,10 @@ router.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const {
@@ -143,7 +204,10 @@ router.post(
       });
 
       if (!list) {
-        return res.status(404).json({ error: "List not found" });
+        return res.status(404).json({
+          success: false,
+          error: "List not found",
+        });
       }
 
       // Get next position
@@ -166,10 +230,16 @@ router.post(
         position,
       });
 
-      res.status(201).json(item);
+      res.status(201).json({
+        success: true,
+        data: item,
+      });
     } catch (error) {
       console.error("Error creating shopping item:", error);
-      res.status(500).json({ error: "Failed to create shopping item" });
+      res.status(500).json({
+        success: false,
+        error: "Failed to create shopping item",
+      });
     }
   }
 );
@@ -201,7 +271,10 @@ router.put(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const item = await ShoppingItem.findOne({
@@ -212,14 +285,23 @@ router.put(
       });
 
       if (!item) {
-        return res.status(404).json({ error: "Shopping item not found" });
+        return res.status(404).json({
+        success: false,
+        error: "Shopping item not found",
+      });
       }
 
       const updatedItem = await item.update(req.body);
-      res.json(updatedItem);
+      res.json({
+        success: true,
+        data: updatedItem,
+      });
     } catch (error) {
       console.error("Error updating shopping item:", error);
-      res.status(500).json({ error: "Failed to update shopping item" });
+      res.status(500).json({
+        success: false,
+        error: "Failed to update shopping item",
+      });
     }
   }
 );
@@ -235,14 +317,23 @@ router.delete("/:id", auth, async (req, res) => {
     });
 
     if (!item) {
-      return res.status(404).json({ error: "Shopping item not found" });
+      return res.status(404).json({
+        success: false,
+        error: "Shopping item not found",
+      });
     }
 
     await item.destroy();
-    res.json({ message: "Shopping item deleted successfully" });
+    res.json({
+      success: true,
+      message: "Shopping item deleted successfully",
+    });
   } catch (error) {
     console.error("Error deleting shopping item:", error);
-    res.status(500).json({ error: "Failed to delete shopping item" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete shopping item",
+    });
   }
 });
 
@@ -257,7 +348,10 @@ router.patch("/:id/toggle", auth, async (req, res) => {
     });
 
     if (!item) {
-      return res.status(404).json({ error: "Shopping item not found" });
+      return res.status(404).json({
+        success: false,
+        error: "Shopping item not found",
+      });
     }
 
     const updatedItem = await item.update({
@@ -265,10 +359,16 @@ router.patch("/:id/toggle", auth, async (req, res) => {
       checkedAt: !item.checked ? new Date() : null,
     });
 
-    res.json(updatedItem);
+    res.json({
+      success: true,
+      data: updatedItem,
+    });
   } catch (error) {
     console.error("Error toggling shopping item:", error);
-    res.status(500).json({ error: "Failed to toggle shopping item" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to toggle shopping item",
+    });
   }
 });
 
@@ -283,17 +383,26 @@ router.post("/:id/search-price", auth, async (req, res) => {
     });
 
     if (!item) {
-      return res.status(404).json({ error: "Shopping item not found" });
+      return res.status(404).json({
+        success: false,
+        error: "Shopping item not found",
+      });
     }
 
     const prices = await priceService.searchPrices(item.productName, {
       limit: 10,
     });
 
-    res.json(prices);
+    res.json({
+      success: true,
+      data: prices,
+    });
   } catch (error) {
     console.error("Error searching prices:", error);
-    res.status(500).json({ error: "Failed to search prices" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to search prices",
+    });
   }
 });
 
@@ -313,7 +422,10 @@ router.patch(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const { price, priceSource = "manual", priceUrl } = req.body;
@@ -326,7 +438,10 @@ router.patch(
       });
 
       if (!item) {
-        return res.status(404).json({ error: "Shopping item not found" });
+        return res.status(404).json({
+        success: false,
+        error: "Shopping item not found",
+      });
       }
 
       const updatedItem = await item.update({
@@ -336,10 +451,16 @@ router.patch(
         priceUpdatedAt: new Date(),
       });
 
-      res.json(updatedItem);
+      res.json({
+        success: true,
+        data: updatedItem,
+      });
     } catch (error) {
       console.error("Error updating price:", error);
-      res.status(500).json({ error: "Failed to update price" });
+      res.status(500).json({
+        success: false,
+        error: "Failed to update price",
+      });
     }
   }
 );
@@ -357,7 +478,10 @@ router.patch(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const { items } = req.body;
@@ -374,10 +498,16 @@ router.patch(
         );
       }
 
-      res.json({ message: "Items reordered successfully" });
+      res.json({
+        success: true,
+        message: "Items reordered successfully",
+      });
     } catch (error) {
       console.error("Error reordering items:", error);
-      res.status(500).json({ error: "Failed to reorder items" });
+      res.status(500).json({
+        success: false,
+        error: "Failed to reorder items",
+      });
     }
   }
 );
@@ -427,10 +557,16 @@ router.get("/stats/overview", auth, async (req, res) => {
       ],
     });
 
-    res.json(stats[0]);
+    res.json({
+      success: true,
+      data: stats[0],
+    });
   } catch (error) {
     console.error("Error fetching shopping stats:", error);
-    res.status(500).json({ error: "Failed to fetch shopping statistics" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch shopping statistics",
+    });
   }
 });
 

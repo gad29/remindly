@@ -19,7 +19,10 @@ router.get("/search", auth, async (req, res) => {
     } = req.query;
 
     if (!product) {
-      return res.status(400).json({ error: "Product name is required" });
+      return res.status(400).json({
+        success: false,
+        error: "Product name is required",
+      });
     }
 
     const options = {
@@ -34,9 +37,11 @@ router.get("/search", auth, async (req, res) => {
 
     res.json({
       success: true,
-      product,
-      prices,
-      total: prices.length,
+      data: {
+        product,
+        prices,
+        total: prices.length,
+      },
     });
   } catch (error) {
     console.error("Price search error:", error);
@@ -57,9 +62,11 @@ router.get("/history/:product", auth, async (req, res) => {
 
     res.json({
       success: true,
-      product,
-      history,
-      total: history.length,
+      data: {
+        product,
+        history,
+        total: history.length,
+      },
     });
   } catch (error) {
     console.error("Price history error:", error);
@@ -79,8 +86,10 @@ router.get("/stats/:product", auth, async (req, res) => {
 
     res.json({
       success: true,
-      product,
-      stats,
+      data: {
+        product,
+        stats,
+      },
     });
   } catch (error) {
     console.error("Price stats error:", error);
@@ -96,7 +105,10 @@ router.get("/", auth, async (req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Admin access required" });
+      return res.status(403).json({
+        success: false,
+        error: "Admin access required",
+      });
     }
 
     const {
@@ -144,11 +156,13 @@ router.get("/", auth, async (req, res) => {
 
     res.json({
       success: true,
-      prices: prices.rows,
-      total: prices.count,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(prices.count / limit),
+      data: {
+        prices: prices.rows,
+        total: prices.count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(prices.count / limit),
+      },
     });
   } catch (error) {
     console.error("Error fetching prices:", error);
@@ -164,7 +178,10 @@ router.post("/update-stale", auth, async (req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Admin access required" });
+      return res.status(403).json({
+        success: false,
+        error: "Admin access required",
+      });
     }
 
     await priceService.updateStalePrices();
@@ -207,7 +224,7 @@ router.get("/sources", auth, async (req, res) => {
 
     res.json({
       success: true,
-      sources,
+      data: sources,
     });
   } catch (error) {
     console.error("Error fetching price sources:", error);
@@ -246,7 +263,7 @@ router.get("/stores", auth, async (req, res) => {
 
     res.json({
       success: true,
-      stores,
+      data: stores,
     });
   } catch (error) {
     console.error("Error fetching stores:", error);
@@ -285,7 +302,7 @@ router.get("/categories", auth, async (req, res) => {
 
     res.json({
       success: true,
-      categories,
+      data: categories,
     });
   } catch (error) {
     console.error("Error fetching categories:", error);

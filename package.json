@@ -1,0 +1,45 @@
+{
+  "name": "remindly",
+  "version": "2.0.1",
+  "private": true,
+  "description": "One Remindly app for web, Windows, Android and iOS",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix web-app",
+    "build:web": "node web-app/node_modules/vite/bin/vite.js build web-app --config web-app/vite.config.ts",
+    "start": "node backend/server.js",
+    "dev:api": "npm run dev --prefix backend",
+    "dev:web": "npm run dev --prefix web-app",
+    "desktop": "electron .",
+    "build:windows": "node web-app/node_modules/vite/bin/vite.js build web-app --config web-app/vite.config.ts && electron-builder --win nsis",
+    "mobile:sync": "node web-app/node_modules/vite/bin/vite.js build web-app --config web-app/vite.config.ts && cap sync",
+    "mobile:android": "npm run mobile:sync && cap open android",
+    "mobile:ios": "npm run mobile:sync && cap open ios"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/cli": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/ios": "^7.4.3",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "app.remindly.desktop",
+    "productName": "Remindly",
+    "directories": { "output": "release", "buildResources": "build" },
+    "files": ["desktop/**/*", "package.json"],
+    "win": {
+      "target": ["nsis"],
+      "icon": "LogoRemindly.png",
+      "artifactName": "Remindly-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

@@ -103,22 +103,22 @@ const Price = sequelize.define(
     tableName: "prices",
     indexes: [
       {
-        fields: ["productName"],
+        fields: ["product_name"],
       },
       {
         fields: ["source"],
       },
       {
-        fields: ["storeName"],
+        fields: ["store_name"],
       },
       {
         fields: ["category"],
       },
       {
-        fields: ["isActive"],
+        fields: ["is_active"],
       },
       {
-        fields: ["lastChecked"],
+        fields: ["last_checked"],
       },
       {
         fields: ["price"],

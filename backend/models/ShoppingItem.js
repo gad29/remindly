@@ -82,6 +82,16 @@ const ShoppingItem = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    categoryId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: "categories",
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "SET NULL",
+    },
     notes: {
       type: DataTypes.TEXT,
     },
@@ -102,16 +112,19 @@ const ShoppingItem = sequelize.define(
     tableName: "shopping_items",
     indexes: [
       {
-        fields: ["listId"],
+        fields: ["list_id"],
       },
       {
-        fields: ["userId"],
+        fields: ["user_id"],
       },
       {
         fields: ["checked"],
       },
       {
         fields: ["category"],
+      },
+      {
+        fields: ["category_id"],
       },
       {
         fields: ["barcode"],

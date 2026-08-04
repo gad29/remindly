@@ -6,6 +6,11 @@ import compression from "compression";
 import rateLimit from "express-rate-limit";
 import "express-async-errors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Import routes
 import authRoutes from "./routes/auth.js";
@@ -22,6 +27,8 @@ import aiRoutes from "./routes/ai.js";
 import reminderRoutes from "./routes/reminders.js";
 import shoppingItemRoutes from "./routes/shoppingItems.js";
 import priceRoutes from "./routes/prices.js";
+import assistantRoutes from "./routes/assistant.js";
+import stewardRoutes from "./routes/steward.js";
 
 // Import models to initialize associations
 import "./models/associations.js";
@@ -114,6 +121,9 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Serve static files (uploads)
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -129,6 +139,19 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/shopping-items", shoppingItemRoutes);
 app.use("/api/prices", priceRoutes);
+app.use("/api/assistant", assistantRoutes);
+app.use("/api/steward", stewardRoutes);
+
+// In production the API and Vue application are one deployable service.
+const webDistPath = path.resolve(__dirname, "../web-app/dist");
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(webDistPath, { maxAge: "1d", index: false }));
+  app.get(/^\/(?!api(?:\/|$)|uploads(?:\/|$)|health$).*/, (req, res, next) => {
+    res.sendFile(path.join(webDistPath, "index.html"), (error) => {
+      if (error) next(error);
+    });
+  });
+}
 
 // 404 handler
 app.use(notFound);
@@ -140,27 +163,37 @@ app.use(errorHandler);
 import sequelize from "./config/database.js";
 // Note: associations.js is already imported at the top of the file
 
-sequelize
-  .sync({ force: false })
+const prepareDatabase = process.env.DB_SYNC_ALTER === "true"
+  ? sequelize.sync({ alter: true })
+  : sequelize.authenticate();
+
+prepareDatabase
   .then(() => {
     app.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
       logger.info(`📱 Environment: ${process.env.NODE_ENV || "development"}`);
       logger.info(`🔗 API URL: http://localhost:${PORT}/api`);
       logger.info(`❤️  Health check: http://localhost:${PORT}/health`);
-      logger.info("Database synchronized");
+      logger.info(process.env.DB_SYNC_ALTER === "true" ? "Database synchronized" : "Database connection verified");
     });
   })
   .catch((err) => {
     logger.error("Failed to synchronize database:", err);
+    logger.error("Error details:", {
+      message: err.message,
+      name: err.name,
+      code: err.code,
+      sql: err.sql
+    });
     logger.warn("Continuing without database synchronization...");
+    logger.warn("⚠️  Data will NOT be saved to database!");
     // Start server anyway
     const server = app.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
       logger.info(`📱 Environment: ${process.env.NODE_ENV || "development"}`);
       logger.info(`🔗 API URL: http://localhost:${PORT}/api`);
       logger.info(`❤️  Health check: http://localhost:${PORT}/health`);
-      logger.warn("Database not synchronized - some features may not work");
+      logger.warn("⚠️  Database not synchronized - data will NOT be saved!");
     });
   });
 

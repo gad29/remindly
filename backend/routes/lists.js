@@ -51,19 +51,35 @@ router.get("/", protect, async (req, res) => {
 // @access  Private
 router.get("/:id", protect, async (req, res) => {
   try {
-    const list = await List.findOne({
-      where: {
-        id: req.params.id,
-        userId: req.user.id,
-      },
-      include: [
-        {
-          model: Task,
-          as: "tasks",
-          order: [["position", "ASC"]],
+    console.log("Getting list with ID:", req.params.id, "for user:", req.user.id);
+    
+    // Try to get list without includes first
+    let list;
+    try {
+      list = await List.findOne({
+        where: {
+          id: req.params.id,
+          userId: req.user.id,
         },
-      ],
-    });
+        include: [
+          {
+            model: Task,
+            as: "tasks",
+            required: false, // Make it optional
+            order: [["position", "ASC"]],
+          },
+        ],
+      });
+    } catch (includeError) {
+      console.warn("Include failed, trying without tasks:", includeError.message);
+      // If include fails, try without it
+      list = await List.findOne({
+        where: {
+          id: req.params.id,
+          userId: req.user.id,
+        },
+      });
+    }
 
     if (!list) {
       return res.status(404).json({
@@ -78,9 +94,15 @@ router.get("/:id", protect, async (req, res) => {
     });
   } catch (error) {
     console.error("Get list error:", error);
+    console.error("Error details:", {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    });
     res.status(500).json({
       success: false,
-      error: "Server error",
+      error: error.message || "Server error",
+      details: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 });
@@ -166,9 +188,15 @@ router.post(
       });
     } catch (error) {
       console.error("Create list error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
       res.status(500).json({
         success: false,
-        error: "Server error",
+        error: error.message || "Server error",
+        details: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
     }
   }
@@ -376,6 +404,49 @@ router.get("/search", protect, async (req, res) => {
     });
   } catch (error) {
     console.error("Search lists error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Server error",
+    });
+  }
+});
+
+// @desc    Get tasks by list
+// @route   GET /api/lists/:id/tasks
+// @access  Private
+router.get("/:id/tasks", protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify list belongs to user
+    const list = await List.findOne({
+      where: {
+        id: id,
+        userId: req.user.id,
+      },
+    });
+
+    if (!list) {
+      return res.status(404).json({
+        success: false,
+        error: "List not found",
+      });
+    }
+
+    const tasks = await Task.findAll({
+      where: { listId: id },
+      order: [
+        ["position", "ASC"],
+        ["createdAt", "DESC"],
+      ],
+    });
+
+    res.json({
+      success: true,
+      data: tasks,
+    });
+  } catch (error) {
+    console.error("Get tasks by list error:", error);
     res.status(500).json({
       success: false,
       error: "Server error",

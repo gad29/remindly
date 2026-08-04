@@ -35,18 +35,27 @@
                   :key="list.id"
                   class="list-item"
                   elevation="2"
-                  @click="openIdeasList(list)"
                 >
                   <v-card-text class="pa-4">
                     <div class="list-header">
                       <v-icon :color="list.color" size="32" class="mr-3">{{ list.icon }}</v-icon>
-                      <div class="list-info">
+                      <div class="list-info" @click="openIdeasList(list)">
                         <h3 class="list-title">{{ list.name }}</h3>
                         <p class="list-description">{{ list.description || 'No description' }}</p>
                       </div>
+                      <v-btn
+                        icon
+                        variant="text"
+                        size="small"
+                        color="error"
+                        @click.stop="deleteIdeasList(list)"
+                        class="delete-button"
+                      >
+                        <v-icon>mdi-delete</v-icon>
+                      </v-btn>
                     </div>
-                    <div class="list-stats">
-                      <span class="idea-count">{{ list.ideaCount || 0 }} ideas</span>
+                    <div class="list-stats" @click="openIdeasList(list)">
+                      <span class="idea-count">{{ list.taskCount || 0 }} ideas</span>
                       <span class="list-date">{{ formatDate(list.updatedAt) }}</span>
                     </div>
                   </v-card-text>
@@ -133,12 +142,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useListStore } from '@/stores/listStore'
 
 const router = useRouter()
 const { t } = useI18n()
+const listStore = useListStore()
 
 const showCreateListDialog = ref(false)
 const createListFormValid = ref(false)
@@ -165,66 +176,111 @@ const availableIcons = [
   { title: 'Book', value: 'mdi-book-open' },
 ]
 
-// Mock data for now
-const ideasLists = ref([
-  {
-    id: '1',
-    name: 'App Features',
-    description: 'New App Features & Travel Plans',
-    color: 'yellow',
-    icon: 'mdi-lightbulb-outline',
-    ideaCount: 4,
-    updatedAt: new Date()
-  },
-  {
-    id: '2',
-    name: 'Business Ideas',
-    description: 'Entrepreneurial thoughts and concepts',
-    color: 'green',
-    icon: 'mdi-rocket',
-    ideaCount: 2,
-    updatedAt: new Date()
-  },
-  {
-    id: '3',
-    name: 'Creative Projects',
-    description: 'Art, design, and creative endeavors',
-    color: 'purple',
-    icon: 'mdi-palette',
-    ideaCount: 3,
-    updatedAt: new Date()
-  }
-])
+// Get ideas lists from store (filter by icon or name containing "idea")
+const ideasLists = computed(() => {
+  return listStore.lists.filter(list => 
+    list.icon === 'mdi-lightbulb-outline' ||
+    list.name.toLowerCase().includes('idea') || 
+    list.name.toLowerCase().includes('רעיון')
+  )
+})
 
 const openIdeasList = (list: any) => {
   router.push(`/ideas-list/${list.id}`)
 }
 
-const saveNewIdeasList = () => {
-  if (createListFormValid.value) {
-    const newList = {
-      id: Date.now().toString(),
-      name: newIdeasList.value.name,
-      description: newIdeasList.value.description,
-      color: newIdeasList.value.color,
-      icon: newIdeasList.value.icon,
-      ideaCount: 0,
-      updatedAt: new Date(),
-    }
-    ideasLists.value.push(newList)
-    showCreateListDialog.value = false
-    newIdeasList.value = { name: '', description: '', icon: 'mdi-lightbulb-outline', color: '#FFC107' }
+const deleteIdeasList = async (list: any) => {
+  if (!confirm(`Are you sure you want to delete "${list.name}"? This will also delete all ideas in this list.`)) {
+    return
+  }
+  
+  const result = await listStore.deleteList(list.id)
+  if (result.success) {
+    // List is already removed from store by deleteList
+  } else {
+    alert(result.error || 'Failed to delete list')
   }
 }
 
-const formatDate = (date: Date) => {
-  return date.toLocaleDateString()
+const saveNewIdeasList = async () => {
+  if (!createListFormValid.value) return
+  
+  // Extract hex color from color picker (it might be an object or string)
+  let colorValue = newIdeasList.value.color
+  if (typeof colorValue === 'object' && colorValue !== null) {
+    colorValue = colorValue.hex || colorValue.hexa || '#FFC107'
+  }
+  if (!colorValue || typeof colorValue !== 'string') {
+    colorValue = '#FFC107'
+  }
+  // Ensure it starts with #
+  if (!colorValue.startsWith('#')) {
+    colorValue = '#' + colorValue
+  }
+  // Ensure it's 6 hex digits
+  if (colorValue.length === 4) {
+    // Convert #RGB to #RRGGBB
+    colorValue = '#' + colorValue[1] + colorValue[1] + colorValue[2] + colorValue[2] + colorValue[3] + colorValue[3]
+  }
+  
+  try {
+    const result = await listStore.createList({
+      name: newIdeasList.value.name,
+      description: newIdeasList.value.description,
+      icon: newIdeasList.value.icon,
+      color: colorValue,
+    })
+    
+    if (result.success) {
+      // Reload lists to ensure we have the latest data
+      await loadIdeasLists()
+      
+      showCreateListDialog.value = false
+      newIdeasList.value = { name: '', description: '', icon: 'mdi-lightbulb-outline', color: '#FFC107' }
+      
+      if (result.list) {
+        router.push(`/ideas-list/${result.list.id}`)
+      }
+    } else {
+      // Handle "List already exists" error
+      if (result.error && result.error.includes('already exists')) {
+        // Reload lists to find the existing one
+        await loadIdeasLists()
+        const existingList = ideasLists.value.find(
+          list => list.name.toLowerCase() === newIdeasList.value.name.toLowerCase()
+        )
+        
+        if (existingList) {
+          const openExisting = confirm(
+            `A list with the name "${newIdeasList.value.name}" already exists. Would you like to open it?`
+          )
+          if (openExisting) {
+            showCreateListDialog.value = false
+            newIdeasList.value = { name: '', description: '', icon: 'mdi-lightbulb-outline', color: '#FFC107' }
+            router.push(`/ideas-list/${existingList.id}`)
+          }
+        } else {
+          alert(result.error || 'Failed to create ideas list')
+        }
+      } else {
+        alert(result.error || 'Failed to create ideas list')
+      }
+    }
+  } catch (error) {
+    console.error('Error creating ideas list:', error)
+    alert('An unexpected error occurred. Please try again.')
+  }
+}
+
+const formatDate = (date: Date | string | undefined) => {
+  if (!date) return 'N/A'
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleDateString()
 }
 
 const loadIdeasLists = async () => {
   try {
-    // TODO: Implement API call to load ideas lists
-    console.log('Loading ideas lists...')
+    await listStore.loadLists()
   } catch (error) {
     console.error('Error loading ideas lists:', error)
   }
@@ -315,10 +371,18 @@ onMounted(() => {
   display: flex;
   align-items: center;
   margin-bottom: 1rem;
+  position: relative;
 }
 
 .list-info {
   flex: 1;
+  cursor: pointer;
+}
+
+.delete-button {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .list-title {
@@ -340,6 +404,7 @@ onMounted(() => {
   align-items: center;
   font-size: 0.8rem;
   color: #999;
+  cursor: pointer;
 }
 
 .empty-state {

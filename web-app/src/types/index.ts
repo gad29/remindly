@@ -32,9 +32,31 @@ export interface Task {
   dueDate?: string
   dueTime?: string
   completed: boolean
+  metadata?: Record<string, any>
+  isRecurring?: boolean
+  recurringPattern?: Record<string, any>
   position: number
   createdAt: Date
   updatedAt: Date
+}
+
+export interface AssistantAction {
+  type: 'create_task' | 'update_task' | 'complete_task' | 'reopen_task'
+  taskId: string | null
+  listId: string | null
+  title: string | null
+  description: string | null
+  dueDate: string | null
+  dueTime: string | null
+  priority: 'low' | 'medium' | 'high' | 'urgent' | null
+  explanation: string
+}
+
+export interface AssistantPreview {
+  summary: string
+  reply: string
+  actions: AssistantAction[]
+  model: string
 }
 
 // Reminder Types
