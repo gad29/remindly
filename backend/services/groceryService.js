@@ -1,4 +1,5 @@
 import axios from "axios";
+import groceryFeedService from "./groceryFeedService.js";
 
 const cache = new Map();
 const CACHE_TTL = 6 * 60 * 60 * 1000;
@@ -41,6 +42,13 @@ class GroceryService {
     const key = `search:${normalizedQuery.toLowerCase()}:${limit}`;
     const cached = getCached(key);
     if (cached) return cached;
+
+    try {
+      const localProducts = await groceryFeedService.search(normalizedQuery, limit);
+      if (localProducts.length) { setCached(key, localProducts); return localProducts; }
+    } catch (error) {
+      console.warn("Local grocery catalogue search unavailable:", error.message);
+    }
 
     if (process.env.APIFY_TOKEN) {
       try {
@@ -106,6 +114,12 @@ class GroceryService {
   }
 
   async getIsraeliPrices(barcode, options = {}) {
+    try {
+      const localPricing = await groceryFeedService.getPrices(barcode, options);
+      if (localPricing.prices.length) return localPricing;
+    } catch (error) {
+      console.warn("Local grocery price lookup unavailable:", error.message);
+    }
     if (!process.env.APIFY_TOKEN) return { configured: false, provider: "apify", prices: [], summary: null };
     const key = `israel-prices:${barcode}`;
     const cached = getCached(key);

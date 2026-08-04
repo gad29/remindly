@@ -30,6 +30,7 @@ import priceRoutes from "./routes/prices.js";
 import assistantRoutes from "./routes/assistant.js";
 import stewardRoutes from "./routes/steward.js";
 import groceryRoutes from "./routes/grocery.js";
+import groceryFeedService from "./services/groceryFeedService.js";
 
 // Import models to initialize associations
 import "./models/associations.js";
@@ -181,6 +182,7 @@ if (process.env.NODE_ENV !== "test") {
         logger.info(`🔗 API URL: http://localhost:${PORT}/api`);
         logger.info(`❤️  Health check: http://localhost:${PORT}/health`);
         logger.info(process.env.DB_SYNC_ALTER === "true" ? "Database synchronized" : "Database connection verified");
+        groceryFeedService.startScheduler();
       });
     })
     .catch((err) => {

@@ -8,6 +8,9 @@ import { ShoppingItem } from "./ShoppingItem.js";
 import { Price } from "./Price.js";
 import { Category } from "./Category.js";
 import sequelize from "../config/database.js";
+import { GroceryProduct } from "./GroceryProduct.js";
+import { GroceryStore } from "./GroceryStore.js";
+import { GroceryListing } from "./GroceryListing.js";
 
 // Define associations
 User.hasMany(List, {
@@ -144,4 +147,7 @@ export {
   ShoppingItem,
   Price,
   Category,
+  GroceryProduct,
+  GroceryStore,
+  GroceryListing,
 };

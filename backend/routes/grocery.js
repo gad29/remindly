@@ -1,8 +1,14 @@
 import express from "express";
 import { protect } from "../middleware/auth.js";
 import groceryService from "../services/groceryService.js";
+import groceryFeedService from "../services/groceryFeedService.js";
 
 const router = express.Router();
+
+router.get("/catalogue/status", protect, async (req, res) => {
+  try { res.json({ success: true, data: await groceryFeedService.status() }); }
+  catch { res.status(500).json({ success: false, error: "Catalogue status is unavailable" }); }
+});
 
 router.get("/search", protect, async (req, res) => {
   const query = String(req.query.q || "").trim();
