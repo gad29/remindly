@@ -280,6 +280,12 @@ const apiService = {
       api.get<ApiResponse<any>>('/shopping-items/stats/overview', { params })
   },
 
+  grocery: {
+    search: (query: string, limit = 8) => api.get<ApiResponse<any[]>>('/grocery/search', { params: { q: query, limit } }),
+    getProduct: (barcode: string, params: any = {}) => api.get<ApiResponse<any>>(`/grocery/products/${barcode}`, { params }),
+    getPrices: (barcode: string, params: any = {}) => api.get<ApiResponse<any>>(`/grocery/products/${barcode}/prices`, { params })
+  },
+
   // Reminders
   reminders: {
     getAll: (params: any = {}) =>

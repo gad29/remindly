@@ -1,6 +1,7 @@
 import axios from "axios";
 import { Price } from "../models/Price.js";
 import { Category } from "../models/Category.js";
+import groceryService from "./groceryService.js";
 
 class PriceService {
   /**
@@ -113,23 +114,22 @@ class PriceService {
     const results = [];
 
     try {
-      // Google Shopping API (if available)
-      const googleResults = await this.searchGoogleShopping(
-        productName,
-        options
-      );
-      results.push(...googleResults);
-
-      // Israeli supermarket APIs
-      const supermarketResults = await this.searchSupermarketAPIs(
-        productName,
-        options
-      );
-      results.push(...supermarketResults);
-
-      // Web scraping fallback
-      const scrapedResults = await this.scrapePrices(productName, options);
-      results.push(...scrapedResults);
+      if (options.barcode) {
+        const pricing = await groceryService.getIsraeliPrices(options.barcode, options);
+        results.push(...pricing.prices.map((entry) => ({
+          productName: pricing.product?.name || productName,
+          productId: options.barcode,
+          price: entry.promo?.promoPrice || entry.price,
+          currency: "ILS",
+          source: "israel_transparency",
+          storeName: entry.chain?.name || entry.storeName,
+          storeLocation: entry.branch?.city || entry.branch?.address,
+          availability: "in_stock",
+          unitPrice: entry.unitPrice,
+          confidence: 1,
+          metadata: { branch: entry.branch, promotion: entry.promo },
+        })));
+      }
 
       return results;
     } catch (error) {
@@ -143,19 +143,7 @@ class PriceService {
    */
   async searchGoogleShopping(productName, options = {}) {
     try {
-      // Note: This would require Google Shopping API key
-      // For now, return mock data
-      return [
-        {
-          productName: productName,
-          price: Math.random() * 50 + 10,
-          currency: "ILS",
-          source: "google_shopping",
-          storeName: "Online Store",
-          availability: "in_stock",
-          confidence: 0.8,
-        },
-      ];
+      return [];
     } catch (error) {
       console.error("Google Shopping search error:", error);
       return [];
@@ -169,18 +157,6 @@ class PriceService {
     const results = [];
 
     try {
-      // Shufersal API
-      const shufersalResults = await this.searchShufersal(productName);
-      results.push(...shufersalResults);
-
-      // Rami Levy API
-      const ramiLevyResults = await this.searchRamiLevy(productName);
-      results.push(...ramiLevyResults);
-
-      // Victory API
-      const victoryResults = await this.searchVictory(productName);
-      results.push(...victoryResults);
-
       return results;
     } catch (error) {
       console.error("Supermarket API search error:", error);
@@ -193,18 +169,7 @@ class PriceService {
    */
   async searchShufersal(productName) {
     try {
-      // Mock implementation - would need actual API
-      return [
-        {
-          productName: productName,
-          price: Math.random() * 30 + 15,
-          currency: "ILS",
-          source: "shufersal",
-          storeName: "שופרסל",
-          availability: "in_stock",
-          confidence: 0.9,
-        },
-      ];
+      return [];
     } catch (error) {
       console.error("Shufersal search error:", error);
       return [];
@@ -216,18 +181,7 @@ class PriceService {
    */
   async searchRamiLevy(productName) {
     try {
-      // Mock implementation
-      return [
-        {
-          productName: productName,
-          price: Math.random() * 25 + 12,
-          currency: "ILS",
-          source: "rami_levy",
-          storeName: "רמי לוי",
-          availability: "in_stock",
-          confidence: 0.85,
-        },
-      ];
+      return [];
     } catch (error) {
       console.error("Rami Levy search error:", error);
       return [];
@@ -239,18 +193,7 @@ class PriceService {
    */
   async searchVictory(productName) {
     try {
-      // Mock implementation
-      return [
-        {
-          productName: productName,
-          price: Math.random() * 35 + 18,
-          currency: "ILS",
-          source: "victory",
-          storeName: "ויקטורי",
-          availability: "in_stock",
-          confidence: 0.8,
-        },
-      ];
+      return [];
     } catch (error) {
       console.error("Victory search error:", error);
       return [];
@@ -262,19 +205,7 @@ class PriceService {
    */
   async scrapePrices(productName, options = {}) {
     try {
-      // This would use a web scraping library like Puppeteer or Cheerio
-      // For now, return mock data
-      return [
-        {
-          productName: productName,
-          price: Math.random() * 40 + 20,
-          currency: "ILS",
-          source: "scraped",
-          storeName: "Generic Store",
-          availability: "unknown",
-          confidence: 0.6,
-        },
-      ];
+      return [];
     } catch (error) {
       console.error("Web scraping error:", error);
       return [];

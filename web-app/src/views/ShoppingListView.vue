@@ -19,6 +19,27 @@
               <v-alert v-if="error && !loading && !showAddItemDialog" type="error" class="mb-4" dismissible @click:close="error = null">
                 {{ error }}
               </v-alert>
+
+              <section class="smart-add" aria-labelledby="smart-add-title">
+                <div class="smart-copy">
+                  <span class="smart-icon"><v-icon icon="mdi-barcode-scan"/></span>
+                  <div><div class="section-kicker">SMART PRODUCT SEARCH</div><h2 id="smart-add-title">Find the exact product</h2><p>Search in Hebrew or English. Choose a real product to attach its barcode, picture, nutrition, and available Israeli pricing.</p></div>
+                </div>
+                <v-text-field v-model="productQuery" label="Try חלב תנובה, coffee, or a barcode" variant="outlined" prepend-inner-icon="mdi-magnify" clearable hide-details :loading="searchingProducts" autocomplete="off"/>
+                <div v-if="productSuggestions.length" class="product-results">
+                  <button v-for="product in productSuggestions" :key="product.barcode" type="button" @click="selectProduct(product)">
+                    <span class="product-thumb"><img v-if="product.imageUrl" :src="product.imageUrl" :alt="product.name"/><v-icon v-else icon="mdi-package-variant-closed"/></span>
+                    <span class="product-result-copy"><strong>{{ product.name }}</strong><small>{{ [product.brand, product.quantity].filter(Boolean).join(' · ') || `Barcode ${product.barcode}` }}</small></span>
+                    <v-icon icon="mdi-chevron-right"/>
+                  </button>
+                </div>
+                <article v-if="selectedProduct" class="selected-product">
+                  <span class="selected-image"><img v-if="selectedProduct.imageUrl" :src="selectedProduct.imageUrl" :alt="selectedProduct.name"/><v-icon v-else icon="mdi-package-variant" size="38"/></span>
+                  <div class="selected-copy"><div class="section-kicker">SELECTED PRODUCT</div><h3>{{ selectedProduct.name }}</h3><p>{{ [selectedProduct.brand, selectedProduct.quantity].filter(Boolean).join(' · ') }}</p><div class="product-badges"><span v-if="selectedProduct.nutritionGrade">Nutri-score {{ String(selectedProduct.nutritionGrade).toUpperCase() }}</span><span>{{ selectedProduct.barcode }}</span><span v-if="priceSummary">From ₪{{ priceSummary.cheapest || priceSummary.minPrice }}</span></div></div>
+                  <div class="selected-actions"><v-text-field v-model.number="smartQuantity" type="number" min="1" label="Qty" variant="outlined" hide-details/><v-btn color="primary" :loading="addingSmartProduct" @click="addSmartProduct">Add to list</v-btn></div>
+                </article>
+                <div v-if="productQuery.length >= 2 && !searchingProducts && !productSuggestions.length && !selectedProduct" class="no-product"><span>No catalogue match. You can still add it manually.</span><v-btn variant="text" size="small" @click="openManualAdd">Add manually</v-btn></div>
+              </section>
               
               <!-- Shopping Items List -->
               <div v-if="items.length > 0" class="items-list">
@@ -36,10 +57,12 @@
                       hide-details
                     />
                   </div>
+                  <span v-if="item.imageUrl" class="item-product-image"><img :src="item.imageUrl" :alt="item.productName || item.name"/></span>
                   
                   <div class="item-content">
                     <h3 class="item-name">{{ item.name }}</h3>
-                    <p v-if="item.quantity" class="item-quantity">Qty: {{ item.quantity }}</p>
+                    <p class="item-quantity">{{ item.quantity || 1 }} × {{ item.unit || 'item' }}<span v-if="item.metadata?.brand"> · {{ item.metadata.brand }}</span></p>
+                    <div v-if="item.estimatedPrice || item.metadata?.nutritionGrade" class="item-insights"><span v-if="item.estimatedPrice">Estimated ₪{{ item.estimatedPrice }}</span><span v-if="item.metadata?.nutritionGrade">Nutri-score {{ String(item.metadata.nutritionGrade).toUpperCase() }}</span></div>
                   </div>
                   
                   <div class="item-actions">
@@ -326,6 +349,14 @@ const adding = ref(false)
 const saving = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const productQuery = ref('')
+const productSuggestions = ref<any[]>([])
+const selectedProduct = ref<any | null>(null)
+const priceSummary = ref<any | null>(null)
+const searchingProducts = ref(false)
+const addingSmartProduct = ref(false)
+const smartQuantity = ref(1)
+let searchTimer: number | undefined
 
 const newItems = ref<Array<{
   name: string
@@ -359,6 +390,59 @@ const items = ref<any[]>([])
 // Validation rules
 const rules = {
   required: (value: any) => !!value || 'Required field'
+}
+
+watch(productQuery, (query) => {
+  window.clearTimeout(searchTimer)
+  selectedProduct.value = null
+  priceSummary.value = null
+  if (!query || query.trim().length < 2) { productSuggestions.value = []; return }
+  searchTimer = window.setTimeout(async () => {
+    searchingProducts.value = true
+    try {
+      const response = await apiService.grocery.search(query.trim())
+      productSuggestions.value = response.data.data || []
+    } catch { productSuggestions.value = [] }
+    finally { searchingProducts.value = false }
+  }, 650)
+})
+
+const selectProduct = async (product: any) => {
+  selectedProduct.value = product
+  productSuggestions.value = []
+  try {
+    const response = await apiService.grocery.getProduct(product.barcode)
+    selectedProduct.value = response.data.data || product
+    priceSummary.value = selectedProduct.value.pricing?.summary || null
+  } catch { /* Basic catalogue data is still useful offline from price providers. */ }
+}
+
+const openManualAdd = () => {
+  newItems.value = [{ name: productQuery.value.trim(), quantity: 1, price: undefined, notes: '' }]
+  showAddItemDialog.value = true
+}
+
+const addSmartProduct = async () => {
+  if (!selectedProduct.value) return
+  addingSmartProduct.value = true
+  try {
+    const cheapest = priceSummary.value?.cheapest || priceSummary.value?.minPrice || null
+    const response = await apiService.shoppingItems.create({
+      listId: route.params.id,
+      productName: selectedProduct.value.name,
+      quantity: Math.max(1, smartQuantity.value || 1),
+      unit: selectedProduct.value.quantity || 'pcs',
+      barcode: selectedProduct.value.barcode,
+      imageUrl: selectedProduct.value.imageUrl,
+      category: selectedProduct.value.category,
+      estimatedPrice: cheapest,
+      priceSource: cheapest ? 'api' : 'manual',
+      metadata: { brand: selectedProduct.value.brand, ingredients: selectedProduct.value.ingredients, allergens: selectedProduct.value.allergens, nutritionGrade: selectedProduct.value.nutritionGrade, nutriments: selectedProduct.value.nutriments, pricing: selectedProduct.value.pricing }
+    })
+    await loadShoppingItems()
+    productQuery.value = ''; selectedProduct.value = null; priceSummary.value = null; smartQuantity.value = 1
+  } catch (err:any) { error.value = err.response?.data?.error || 'Could not add this product' }
+  finally { addingSmartProduct.value = false }
 }
 
 // Helper function to check if string is a valid UUID
@@ -435,11 +519,13 @@ const loadShoppingItems = async () => {
     console.log('Items array:', itemsArray)
     
     items.value = itemsArray.map((item: any) => ({
+      ...item,
       id: item.id,
       name: item.productName || item.name,
       quantity: item.quantity || 1,
       completed: item.checked || item.completed || false,
-      notes: item.notes || ''
+      notes: item.notes || '',
+      metadata: item.metadata || {}
     }))
     
     console.log('Mapped items:', items.value)
@@ -1035,6 +1121,7 @@ const shareViaWebAPI = async () => {
 }
 
 .shopping-list-card{border:1px solid #dce3df;border-radius:22px;overflow:hidden;box-shadow:none!important}
+.smart-add{padding:22px;border:1px solid #cfe0db;border-radius:20px;background:#f7fbf9;margin-bottom:24px}.smart-copy{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}.smart-icon{width:46px;height:46px;flex:0 0 auto;border-radius:14px;background:#dceee6;color:#245b55;display:grid;place-items:center}.section-kicker{font:700 10px ui-monospace,monospace;letter-spacing:.13em;color:#49716b;margin-bottom:4px}.smart-copy h2,.selected-copy h3{color:#173d3a;margin:0 0 4px}.smart-copy p,.selected-copy p{color:#687572;margin:0;font-size:.82rem}.product-results{border:1px solid #dce3df;border-radius:15px;background:#fff;margin-top:8px;overflow:hidden}.product-results button{width:100%;min-height:68px;padding:9px 12px;display:flex;align-items:center;gap:12px;text-align:left;border:0;border-bottom:1px solid #edf1ef;background:#fff;color:#173d3a}.product-results button:last-child{border-bottom:0}.product-results button:hover,.product-results button:focus-visible{background:#f0f7f4}.product-thumb,.selected-image{display:grid;place-items:center;background:#eef3f1;color:#6a7d79;overflow:hidden}.product-thumb{width:48px;height:48px;border-radius:11px}.product-thumb img,.selected-image img{width:100%;height:100%;object-fit:contain}.product-result-copy{display:flex;flex:1;min-width:0;flex-direction:column}.product-result-copy strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.product-result-copy small{color:#75817f;margin-top:3px}.selected-product{display:grid;grid-template-columns:82px 1fr auto;gap:16px;align-items:center;margin-top:14px;padding:14px;background:#fff;border:1px solid #cfe0db;border-radius:16px}.selected-image{width:82px;height:82px;border-radius:13px}.product-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.product-badges span{font-size:.66rem;color:#245b55;background:#e2f1eb;padding:4px 7px;border-radius:8px}.selected-actions{display:grid;grid-template-columns:78px 130px;gap:8px;align-items:center}.no-product{display:flex;justify-content:space-between;align-items:center;color:#687572;font-size:.8rem;padding-top:12px}
 
 .items-list {
   margin-bottom: 2rem;
@@ -1051,6 +1138,7 @@ const shareViaWebAPI = async () => {
   margin-bottom: 12px;
   transition: all 0.3s ease;
 }
+.item-product-image{width:54px;height:54px;flex:0 0 auto;margin-right:13px;border-radius:12px;background:#eef3f1;overflow:hidden}.item-product-image img{width:100%;height:100%;object-fit:contain}.item-insights{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.item-insights span{font-size:.66rem;color:#245b55;background:#e2f1eb;padding:3px 7px;border-radius:7px}
 
 .shopping-item:hover {
   transform: translateY(-2px);
@@ -1113,6 +1201,7 @@ const shareViaWebAPI = async () => {
 }
 
 @media (max-width: 600px) {
+.smart-add{padding:16px}.selected-product{grid-template-columns:64px 1fr}.selected-image{width:64px;height:64px}.selected-actions{grid-column:1/-1;grid-template-columns:90px 1fr}.no-product{align-items:flex-start;flex-direction:column}
   .action-buttons-row {
     flex-direction: column;
     width: 100%;

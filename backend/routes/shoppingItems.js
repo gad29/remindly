@@ -193,6 +193,12 @@ router.post(
         price,
         categoryId,
         notes,
+        barcode,
+        imageUrl,
+        category,
+        estimatedPrice,
+        priceSource,
+        metadata,
       } = req.body;
 
       // Verify list belongs to user
@@ -227,6 +233,13 @@ router.post(
         price,
         categoryId,
         notes,
+        barcode,
+        imageUrl,
+        category,
+        estimatedPrice,
+        priceSource: priceSource || (estimatedPrice ? "api" : "manual"),
+        priceUpdatedAt: estimatedPrice ? new Date() : null,
+        metadata: metadata || {},
         position,
       });
 
@@ -391,6 +404,7 @@ router.post("/:id/search-price", auth, async (req, res) => {
 
     const prices = await priceService.searchPrices(item.productName, {
       limit: 10,
+      barcode: item.barcode,
     });
 
     res.json({

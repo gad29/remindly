@@ -29,6 +29,7 @@ import shoppingItemRoutes from "./routes/shoppingItems.js";
 import priceRoutes from "./routes/prices.js";
 import assistantRoutes from "./routes/assistant.js";
 import stewardRoutes from "./routes/steward.js";
+import groceryRoutes from "./routes/grocery.js";
 
 // Import models to initialize associations
 import "./models/associations.js";
@@ -144,6 +145,7 @@ app.use("/api/shopping-items", shoppingItemRoutes);
 app.use("/api/prices", priceRoutes);
 app.use("/api/assistant", assistantRoutes);
 app.use("/api/steward", stewardRoutes);
+app.use("/api/grocery", groceryRoutes);
 
 // In production the API and Vue application are one deployable service.
 const webDistPath = path.resolve(__dirname, "../web-app/dist");
