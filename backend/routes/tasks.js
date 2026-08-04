@@ -135,6 +135,8 @@ router.post(
       .optional()
       .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
       .withMessage("Due time must be valid time format (HH:MM)"),
+    body("metadata").optional().isObject().withMessage("Metadata must be an object"),
+    body("completed").optional().isBoolean().withMessage("Completed must be boolean"),
   ],
   async (req, res) => {
     try {
@@ -154,6 +156,8 @@ router.post(
         priority = "medium",
         dueDate,
         dueTime,
+        metadata = {},
+        completed = false,
       } = req.body;
 
       // Verify list belongs to user
@@ -185,6 +189,8 @@ router.post(
         priority,
         dueDate,
         dueTime,
+        metadata,
+        completed,
         position,
         userId: req.user.id,
       });
@@ -249,6 +255,8 @@ router.put(
       .optional()
       .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
       .withMessage("Due time must be valid time format (HH:MM)"),
+    body("metadata").optional().isObject().withMessage("Metadata must be an object"),
+    body("completed").optional().isBoolean().withMessage("Completed must be boolean"),
   ],
   async (req, res) => {
     try {
@@ -275,7 +283,7 @@ router.put(
         });
       }
 
-      const { title, description, priority, dueDate, dueTime } = req.body;
+      const { title, description, priority, dueDate, dueTime, metadata, completed } = req.body;
       const updateData = {};
 
       if (title) updateData.title = title;
@@ -283,6 +291,8 @@ router.put(
       if (priority) updateData.priority = priority;
       if (dueDate !== undefined) updateData.dueDate = dueDate;
       if (dueTime !== undefined) updateData.dueTime = dueTime;
+      if (metadata !== undefined) updateData.metadata = metadata;
+      if (completed !== undefined) updateData.completed = completed;
 
       await task.update(updateData);
 

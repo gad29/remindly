@@ -1,774 +1,106 @@
 <template>
-  <div class="task-list-view">
-    <!-- Header Section -->
-    <div class="header-section">
-      <div class="header-content">
-        <v-icon class="mr-2 header-icon" :color="toDoList?.color || 'white'">{{ toDoList?.icon || 'mdi-checkbox-marked-circle-outline' }}</v-icon>
-        <h1 class="app-title">{{ toDoList?.name || 'TO-DOs' }}</h1>
-        <p class="app-subtitle">{{ toDoList?.description || 'Work & Personal, This Week' }}</p>
+  <v-container class="routine-page" fluid>
+    <v-btn variant="text" prepend-icon="mdi-arrow-left" class="back-link" @click="router.push('/lists')">All lists</v-btn>
+
+    <header class="routine-header">
+      <div>
+        <div class="kicker">REMINDLY ROUTINE</div>
+        <h1>{{ currentList?.name || 'Your list' }}</h1>
+        <p>{{ currentList?.description || 'Move through the work at your own pace. Every guide is editable.' }}</p>
       </div>
+      <div class="readiness" :style="{ '--progress': `${completion}%` }"><strong>{{ completion }}%</strong><span>complete</span></div>
+    </header>
+
+    <v-alert v-if="error" type="error" variant="tonal" closable class="my-5" @click:close="error=''">{{ error }}</v-alert>
+
+    <section v-if="nextTask" class="next-card">
+      <div><div class="kicker">NEXT CLEAR ACTION</div><h2>{{ nextTask.title }}</h2><p>{{ nextTask.description || 'Open the guide and take it one step at a time.' }}</p></div>
+      <v-btn color="#cce9d8" variant="flat" prepend-icon="mdi-book-open-page-variant-outline" @click="openGuide(nextTask)">Open guide</v-btn>
+    </section>
+
+    <div class="toolbar">
+      <div class="filter-row" role="group" aria-label="Filter tasks">
+        <v-chip v-for="filter in filters" :key="filter" :color="activeFilter===filter ? 'primary' : undefined" :variant="activeFilter===filter ? 'flat' : 'outlined'" @click="activeFilter=filter">{{ filter }}</v-chip>
+      </div>
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="openNewTask">Add task</v-btn>
     </div>
 
-    <!-- Main Content -->
-    <v-container fluid class="pa-4">
-      <v-row>
-        <v-col cols="12">
-          <v-card class="task-list-card" elevation="4">
-            <v-card-text class="pa-6">
-              <!-- Error Message -->
-              <v-alert v-if="error && !loading" type="error" class="mb-4" dismissible @click:close="error = null">
-                {{ error }}
-              </v-alert>
+    <div v-if="loading" class="loading-state"><v-progress-circular indeterminate color="primary"/><span>Loading routine…</span></div>
+    <section v-else-if="filteredTasks.length" class="routine-list">
+      <article v-for="task in filteredTasks" :key="task.id" :class="['routine-row',{done:task.completed}]">
+        <v-checkbox-btn :model-value="task.completed" color="primary" :aria-label="`Mark ${task.title} complete`" @click="toggleTask(task)"/>
+        <button class="task-copy" type="button" @click="openGuide(task)">
+          <strong>{{ task.title }}</strong>
+          <span>{{ task.description || 'No description yet' }}</span>
+          <small><v-icon icon="mdi-repeat" size="13"/>{{ frequencyLabel(task) }}<template v-if="task.dueDate"> · Due {{ formatDate(task.dueDate) }}</template></small>
+        </button>
+        <v-menu>
+          <template #activator="{ props }"><v-btn v-bind="props" icon="mdi-dots-horizontal" variant="text" aria-label="Task actions"/></template>
+          <v-list density="compact">
+            <v-list-item prepend-icon="mdi-pencil-outline" title="Edit guide" @click="openGuide(task)"/>
+            <v-list-item prepend-icon="mdi-delete-outline" title="Delete task" @click="deleteTask(task)"/>
+          </v-list>
+        </v-menu>
+      </article>
+    </section>
+    <section v-else class="empty-state"><v-icon icon="mdi-format-list-checks" size="42"/><h2>No tasks here yet</h2><p>Add the first task and include a guide if it needs several steps.</p><v-btn color="primary" prepend-icon="mdi-plus" @click="openNewTask">Add first task</v-btn></section>
 
-              <!-- Loading State -->
-              <div v-if="loading" class="text-center pa-8">
-                <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
-                <p class="mt-4">Loading tasks...</p>
-              </div>
+    <v-dialog v-model="guideOpen" max-width="760" scrollable>
+      <v-card class="guide-card">
+        <v-card-title><span>{{ editingId ? 'Edit task guide' : 'Create guided task' }}</span><v-spacer/><v-btn icon="mdi-close" variant="text" @click="guideOpen=false"/></v-card-title>
+        <v-card-text>
+          <v-text-field v-model="form.title" label="Task name" variant="outlined" :rules="[required]" autofocus/>
+          <v-textarea v-model="form.description" label="What is the outcome?" variant="outlined" rows="2"/>
+          <div class="form-grid">
+            <v-select v-model="form.frequency" :items="frequencies" label="Routine" variant="outlined"/>
+            <v-text-field v-model="form.dueDate" type="date" label="Due date" variant="outlined"/>
+            <v-select v-model="form.priority" :items="priorities" label="Priority" variant="outlined"/>
+          </div>
+          <div class="guide-heading"><div><strong>Step-by-step guide</strong><p>Write each action in the order you want to follow it.</p></div><v-btn variant="tonal" prepend-icon="mdi-plus" @click="form.steps.push('')">Add step</v-btn></div>
+          <div v-for="(_,index) in form.steps" :key="index" class="step-edit"><span>{{ index+1 }}</span><v-text-field v-model="form.steps[index]" :label="`Step ${index+1}`" variant="outlined" density="compact" hide-details/><v-btn icon="mdi-close" variant="text" :aria-label="`Remove step ${index+1}`" @click="form.steps.splice(index,1)"/></div>
+          <v-textarea v-model="form.safety" label="Safety note or important warning" variant="outlined" rows="2" class="mt-5"/>
+          <v-textarea v-model="form.notes" label="Your notes" variant="outlined" rows="3"/>
+        </v-card-text>
+        <v-card-actions><v-btn v-if="editingId" color="error" variant="text" @click="deleteCurrent">Delete</v-btn><v-spacer/><v-btn variant="text" @click="guideOpen=false">Cancel</v-btn><v-btn color="primary" :loading="saving" :disabled="!form.title.trim()" @click="saveTask">Save task</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
 
-              <!-- Tasks List -->
-              <div v-else-if="tasks.length > 0" class="tasks-list">
-                <div
-                  v-for="task in tasks"
-                  :key="task.id"
-                  class="task-item"
-                  :class="{ 'completed': task.completed }"
-                >
-                  <div class="task-left">
-                    <v-checkbox-btn
-                      v-model="task.completed"
-                      color="primary"
-                      @click.stop="toggleTaskCompletion(task)"
-                    />
-                  </div>
-
-                  <div class="task-content">
-                    <h3 class="task-title">{{ task.title }}</h3>
-                    <p v-if="task.description" class="task-description">{{ task.description }}</p>
-                  </div>
-
-                  <div class="task-actions">
-                    <v-btn
-                      icon
-                      variant="text"
-                      size="small"
-                      @click.stop="editTask(task)"
-                    >
-                      <v-icon>mdi-pencil</v-icon>
-                    </v-btn>
-                    <v-btn
-                      icon
-                      variant="text"
-                      size="small"
-                      @click.stop="deleteTask(task)"
-                    >
-                      <v-icon>mdi-delete</v-icon>
-                    </v-btn>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Empty State -->
-              <div v-else-if="!loading" class="empty-state">
-                <v-icon size="80" color="grey" class="mb-4">mdi-checkbox-marked-circle-outline</v-icon>
-                <h3 class="empty-title">No Tasks Yet</h3>
-                <p class="empty-description">Add your first task to this list</p>
-              </div>
-
-              <!-- Action Buttons Section -->
-              <div class="add-item-section">
-                <div class="action-buttons-row">
-                  <v-btn
-                    color="primary"
-                    size="large"
-                    @click="showAddTaskDialog = true"
-                    class="add-item-button"
-                  >
-                    <v-icon start>mdi-plus</v-icon>
-                    Add Task
-                  </v-btn>
-                  
-                  <v-btn
-                    color="secondary"
-                    size="large"
-                    @click="printOrSavePDF"
-                    class="action-button"
-                    :disabled="tasks.length === 0"
-                  >
-                    <v-icon start>mdi-printer</v-icon>
-                    Save/Print PDF
-                  </v-btn>
-                  
-                  <v-menu>
-                    <template v-slot:activator="{ props }">
-                      <v-btn
-                        color="success"
-                        size="large"
-                        v-bind="props"
-                        class="action-button"
-                        :disabled="tasks.length === 0"
-                      >
-                        <v-icon start>mdi-share-variant</v-icon>
-                        Share
-                      </v-btn>
-                    </template>
-                    <v-list>
-                      <v-list-item @click="shareViaWhatsApp">
-                        <v-list-item-title>
-                          <v-icon class="mr-2">mdi-whatsapp</v-icon>
-                          WhatsApp
-                        </v-list-item-title>
-                      </v-list-item>
-                      <v-list-item @click="shareViaSMS">
-                        <v-list-item-title>
-                          <v-icon class="mr-2">mdi-message-text</v-icon>
-                          SMS
-                        </v-list-item-title>
-                      </v-list-item>
-                      <v-list-item @click="shareViaEmail">
-                        <v-list-item-title>
-                          <v-icon class="mr-2">mdi-email</v-icon>
-                          Email
-                        </v-list-item-title>
-                      </v-list-item>
-                      <v-list-item @click="copyShareLink">
-                        <v-list-item-title>
-                          <v-icon class="mr-2">mdi-link</v-icon>
-                          Copy Link
-                        </v-list-item-title>
-                      </v-list-item>
-                      <v-list-item v-if="canUseWebShare" @click="shareViaWebAPI">
-                        <v-list-item-title>
-                          <v-icon class="mr-2">mdi-share</v-icon>
-                          More Options
-                        </v-list-item-title>
-                      </v-list-item>
-                    </v-list>
-                  </v-menu>
-                </div>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-
-      <!-- Add/Edit Task Dialog -->
-      <v-dialog v-model="showAddTaskDialog" max-width="500">
-        <v-card>
-          <v-card-title class="text-h5">{{ isEditing ? 'Edit Task' : 'Add New Task' }}</v-card-title>
-          <v-card-text>
-            <v-form ref="taskForm" v-model="taskFormValid">
-              <v-text-field
-                v-model="currentTask.title"
-                label="Task Title"
-                :rules="[rules.required]"
-                required
-                class="mb-4"
-              />
-              <v-textarea
-                v-model="currentTask.description"
-                label="Description (Optional)"
-                rows="3"
-                class="mb-4"
-              />
-              <v-checkbox
-                v-model="currentTask.completed"
-                label="Mark as Completed"
-                class="mb-4"
-              />
-            </v-form>
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn color="grey" variant="text" @click="cancelTaskDialog">Cancel</v-btn>
-            <v-btn color="primary" @click="saveTask" :disabled="!taskFormValid">{{ isEditing ? 'Save Changes' : 'Add Task' }}</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
-    </v-container>
-  </div>
+    <v-snackbar v-model="saved" color="success" timeout="2200">Task guide saved</v-snackbar>
+  </v-container>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useListStore } from '@/stores/listStore'
 import { useTaskStore } from '@/stores/taskStore'
+import type { Task } from '@/types'
 
-const route = useRoute()
-const router = useRouter()
-
-// Helper function to check if string is a valid UUID
-const isValidUUID = (str: string): boolean => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  return uuidRegex.test(str)
-}
-
-const listId = computed(() => {
-  const id = route.params.id as string
-  if (!isValidUUID(id)) {
-    return null
-  }
-  return id
-})
-
-const error = ref<string | null>(null)
-
-const listStore = useListStore()
-const taskStore = useTaskStore()
-
-const showAddTaskDialog = ref(false)
-const taskFormValid = ref(false)
-const isEditing = ref(false)
-const currentTask = ref({
-  id: '',
-  title: '',
-  description: '',
-  completed: false,
-  listId: '',
-})
-
-const toDoList = computed(() => {
-  if (!listId.value) return null
-  return listStore.getListById(listId.value) || null
-})
-
-const tasks = computed(() => {
-  if (!listId.value) return []
-  try {
-    return taskStore.getTasksByListId(listId.value) || []
-  } catch (err) {
-    console.error('Error getting tasks by list ID:', err)
-    return []
-  }
-})
-
-const loading = computed(() => taskStore.loading || listStore.loading)
-
-const rules = {
-  required: (value: any) => !!value || 'Required field'
-}
-
-const toggleTaskCompletion = async (task: any) => {
-  try {
-    await taskStore.toggleTaskCompletion(task.id)
-    error.value = null
-  } catch (err: any) {
-    error.value = err.response?.data?.error || 'Failed to toggle task completion'
-    console.error('Error toggling task:', err)
-  }
-}
-
-const editTask = (task: any) => {
-  if (!listId.value) {
-    error.value = 'Invalid list ID. Cannot edit task.'
-    return
-  }
-  isEditing.value = true
-  currentTask.value = { ...task, listId: listId.value }
-  showAddTaskDialog.value = true
-  error.value = null
-}
-
-const deleteTask = async (task: any) => {
-  if (confirm(`Are you sure you want to delete "${task.title}"?`)) {
-    try {
-      await taskStore.deleteTask(task.id)
-      error.value = null
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Failed to delete task'
-      console.error('Error deleting task:', err)
-    }
-  }
-}
-
-const saveTask = async () => {
-  if (!taskFormValid.value) {
-    error.value = 'Please fill in all required fields'
-    return
-  }
-
-  if (!listId.value) {
-    error.value = 'Invalid list ID. Please create a new task list.'
-    return
-  }
-
-  try {
-    if (isEditing.value) {
-      await taskStore.updateTask(currentTask.value.id, {
-        title: currentTask.value.title,
-        description: currentTask.value.description,
-        completed: currentTask.value.completed,
-      })
-    } else {
-      await taskStore.addTask({
-        title: currentTask.value.title,
-        description: currentTask.value.description,
-        listId: listId.value!,
-        completed: currentTask.value.completed,
-      })
-    }
-    error.value = null
-    cancelTaskDialog()
-  } catch (err: any) {
-    error.value = err.response?.data?.error || 'Failed to save task'
-    console.error('Error saving task:', err)
-  }
-}
-
-const cancelTaskDialog = () => {
-  showAddTaskDialog.value = false
-  isEditing.value = false
-  currentTask.value = {
-    id: '',
-    title: '',
-    description: '',
-    completed: false,
-    listId: '',
-  }
-  error.value = null
-}
-
-const loadTaskList = async () => {
-  const id = route.params.id as string
-  
-  // Check if the ID is a valid UUID
-  if (!isValidUUID(id)) {
-    error.value = `Invalid list ID format. Please create a new task list from the task lists page.`
-    // Redirect to task lists page after 3 seconds
-    setTimeout(() => {
-      router.push('/tasks-lists')
-    }, 3000)
-    return
-  }
-
-  error.value = null
-  
-  try {
-    await listStore.loadLists()
-    await taskStore.loadTasksByList(id)
-  } catch (err: any) {
-    console.error('Error loading task list:', err)
-    error.value = err.response?.data?.error || 'Failed to load task list'
-  }
-}
-
-onMounted(() => {
-  loadTaskList()
-})
-
-// Watch for route changes to reload data if list ID changes
-watch(
-  () => route.params.id,
-  (newId, oldId) => {
-    if (newId && newId !== oldId) {
-      loadTaskList()
-    }
-  }
-)
-
-// Share and Print functionality
-const canUseWebShare = computed(() => {
-  return typeof navigator !== 'undefined' && 'share' in navigator
-})
-
-const generateTaskListText = () => {
-  const listName = toDoList.value?.name || 'Task List'
-  const description = toDoList.value?.description || ''
-  let text = `📋 ${listName}\n`
-  if (description) {
-    text += `${description}\n\n`
-  }
-  text += 'Tasks:\n'
-  tasks.value.forEach((task) => {
-    const checkbox = task.completed ? '✅' : '☐'
-    text += `${checkbox} ${task.title}`
-    if (task.description) {
-      text += ` - ${task.description}`
-    }
-    if (task.dueDate) {
-      text += ` (Due: ${new Date(task.dueDate).toLocaleDateString()})`
-    }
-    text += '\n'
-  })
-  return text
-}
-
-const printOrSavePDF = () => {
-  const listName = toDoList.value?.name || 'Task List'
-  const description = toDoList.value?.description || ''
-  
-  // Create a hidden iframe for printing
-  const iframe = document.createElement('iframe')
-  iframe.style.position = 'fixed'
-  iframe.style.right = '0'
-  iframe.style.bottom = '0'
-  iframe.style.width = '0'
-  iframe.style.height = '0'
-  iframe.style.border = '0'
-  document.body.appendChild(iframe)
-  
-  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
-  
-  if (!iframeDoc) {
-    error.value = 'Failed to create print window. Please try again.'
-    document.body.removeChild(iframe)
-    return
-  }
-  
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>${listName}</title>
-      <meta charset="UTF-8">
-      <style>
-        @media print {
-          @page {
-            margin: 1cm;
-          }
-        }
-        body {
-          font-family: Arial, sans-serif;
-          padding: 20px;
-          max-width: 800px;
-          margin: 0 auto;
-        }
-        h1 {
-          color: #2c3e50;
-          border-bottom: 3px solid #1976d2;
-          padding-bottom: 10px;
-        }
-        .description {
-          color: #666;
-          margin-bottom: 20px;
-          font-style: italic;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 20px;
-        }
-        th {
-          background-color: #1976d2;
-          color: white;
-          padding: 12px;
-          text-align: left;
-        }
-        td {
-          padding: 10px;
-          border-bottom: 1px solid #ddd;
-        }
-        tr:nth-child(even) {
-          background-color: #f5f5f5;
-        }
-        .completed {
-          text-decoration: line-through;
-          color: #999;
-        }
-        .checkbox {
-          font-size: 18px;
-          margin-right: 10px;
-        }
-      </style>
-    </head>
-    <body>
-      <div style="text-align: center; margin-bottom: 20px; padding: 10px; background-color: #f5f5f5; border-radius: 8px;">
-        <h2 style="margin: 0; color: #1976d2; font-size: 1.5rem; font-weight: 600;">רשימת משימות / Task List</h2>
-      </div>
-      <h1>${listName}</h1>
-      ${description ? `<p class="description">${description}</p>` : ''}
-      <table>
-        <thead>
-          <tr>
-            <th>Status</th>
-            <th>Task</th>
-            <th>Description</th>
-            <th>Due Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tasks.value.map(task => `
-            <tr class="${task.completed ? 'completed' : ''}">
-              <td><span class="checkbox">${task.completed ? '✅' : '☐'}</span></td>
-              <td>${task.title || '-'}</td>
-              <td>${task.description || '-'}</td>
-              <td>${task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '-'}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      <p style="margin-top: 30px; color: #666; font-size: 12px;">
-        Generated from Remindly on ${new Date().toLocaleString()}
-      </p>
-    </body>
-    </html>
-  `
-  
-  iframeDoc.open()
-  iframeDoc.write(htmlContent)
-  iframeDoc.close()
-  
-  // Wait for content to load, then print
-  iframe.onload = () => {
-    setTimeout(() => {
-      iframe.contentWindow?.focus()
-      iframe.contentWindow?.print()
-      setTimeout(() => {
-        document.body.removeChild(iframe)
-      }, 1000)
-    }, 250)
-  }
-  
-  // Fallback if onload doesn't fire
-  setTimeout(() => {
-    if (iframe.contentWindow) {
-      iframe.contentWindow.focus()
-      iframe.contentWindow.print()
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe)
-        }
-      }, 1000)
-    }
-  }, 500)
-}
-
-const shareViaWhatsApp = () => {
-  const text = generateTaskListText()
-  const encodedText = encodeURIComponent(text)
-  const url = `https://wa.me/?text=${encodedText}`
-  window.open(url, '_blank')
-}
-
-const shareViaSMS = () => {
-  const text = generateTaskListText()
-  const encodedText = encodeURIComponent(text)
-  const url = `sms:?body=${encodedText}`
-  window.location.href = url
-}
-
-const shareViaEmail = () => {
-  const subject = encodeURIComponent(toDoList.value?.name || 'Task List')
-  const body = encodeURIComponent(generateTaskListText())
-  const url = `mailto:?subject=${subject}&body=${body}`
-  window.location.href = url
-}
-
-const copyShareLink = async () => {
-  const listId = route.params.id
-  const shareUrl = `${window.location.origin}/task-list/${listId}`
-  
-  try {
-    await navigator.clipboard.writeText(shareUrl)
-    alert('Link copied to clipboard!')
-  } catch (err) {
-    console.error('Failed to copy link:', err)
-    error.value = 'Failed to copy link. Please copy manually: ' + shareUrl
-  }
-}
-
-const shareViaWebAPI = async () => {
-  if (!canUseWebShare.value) return
-  
-  const text = generateTaskListText()
-  const listId = route.params.id
-  const shareUrl = `${window.location.origin}/task-list/${listId}`
-  
-  try {
-    await navigator.share({
-      title: toDoList.value?.name || 'Task List',
-      text: text,
-      url: shareUrl
-    })
-  } catch (err: any) {
-    if (err.name !== 'AbortError') {
-      console.error('Error sharing:', err)
-      error.value = 'Failed to share. Please try another method.'
-    }
-  }
-}
+const route=useRoute(),router=useRouter(),listStore=useListStore(),taskStore=useTaskStore()
+const listId=computed(()=>String(route.params.id||'')),currentList=computed(()=>listStore.getListById(listId.value))
+const tasks=computed(()=>taskStore.getTasksByListId(listId.value)),loading=computed(()=>taskStore.loading||listStore.loading)
+const error=ref(''),activeFilter=ref('All'),guideOpen=ref(false),editingId=ref(''),saving=ref(false),saved=ref(false)
+const filters=['All','Open','Completed','Once','Daily','Weekly','Monthly'],frequencies=['Once','Daily','Weekly','Monthly','Quarterly','Yearly'],priorities=['low','medium','high','urgent']
+const blank=()=>({title:'',description:'',frequency:'Once',dueDate:'',priority:'medium' as const,steps:[] as string[],safety:'',notes:''})
+const form=reactive(blank())
+const completion=computed(()=>tasks.value.length?Math.round(tasks.value.filter(t=>t.completed).length/tasks.value.length*100):0)
+const nextTask=computed(()=>tasks.value.find(t=>!t.completed))
+const frequencyLabel=(task:Task)=>task.metadata?.frequency||'Once'
+const filteredTasks=computed(()=>tasks.value.filter(task=>activeFilter.value==='All'||(activeFilter.value==='Open'&&!task.completed)||(activeFilter.value==='Completed'&&task.completed)||frequencyLabel(task)===activeFilter.value))
+const required=(value:string)=>!!value?.trim()||'Task name is required'
+const formatDate=(value:string)=>new Date(`${value}T00:00:00`).toLocaleDateString()
+const resetForm=()=>Object.assign(form,blank())
+const openNewTask=()=>{editingId.value='';resetForm();guideOpen.value=true}
+const openGuide=(task:Task)=>{editingId.value=task.id;Object.assign(form,{title:task.title,description:task.description||'',frequency:frequencyLabel(task),dueDate:task.dueDate||'',priority:task.priority||'medium',steps:[...(task.metadata?.steps||[])],safety:task.metadata?.safety||'',notes:task.metadata?.notes||''});guideOpen.value=true}
+const metadata=()=>({frequency:form.frequency,steps:form.steps.map(s=>s.trim()).filter(Boolean),safety:form.safety.trim(),notes:form.notes.trim()})
+const saveTask=async()=>{if(!form.title.trim())return;saving.value=true;const data={title:form.title.trim(),description:form.description.trim(),listId:listId.value,priority:form.priority,dueDate:form.dueDate||undefined,metadata:metadata()};const result=editingId.value?await taskStore.updateTask(editingId.value,data):await taskStore.addTask(data);saving.value=false;if(result?.success){guideOpen.value=false;saved.value=true}else error.value=result?.error||'Could not save this task'}
+const toggleTask=async(task:Task)=>{const result=await taskStore.toggleTaskCompletion(task.id);if(!result?.success)error.value=result?.error||'Could not update this task'}
+const deleteTask=async(task:Task)=>{if(confirm(`Delete “${task.title}”?`)){const result=await taskStore.deleteTask(task.id);if(!result.success)error.value=result.error||'Could not delete task'}}
+const deleteCurrent=async()=>{const task=tasks.value.find(t=>t.id===editingId.value);if(task){guideOpen.value=false;await deleteTask(task)}}
+const load=async()=>{if(!/^[0-9a-f-]{36}$/i.test(listId.value)){router.push('/lists');return}await Promise.all([listStore.loadLists(),taskStore.loadTasksByList(listId.value)])}
+onMounted(load);watch(()=>route.params.id,load)
 </script>
 
 <style scoped>
-.task-list-view {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  padding: 0;
-}
-
-.header-section {
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  padding: 2rem 1rem;
-  text-align: center;
-}
-
-.header-content {
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-.header-icon {
-  color: white;
-  font-size: 2rem;
-}
-
-.app-title {
-  font-size: 2.5rem;
-  font-weight: 900;
-  color: #2c3e50;
-  margin: 0.5rem 0;
-  letter-spacing: 2px;
-}
-
-.app-subtitle {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0;
-  letter-spacing: 1px;
-}
-
-.task-list-card {
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.tasks-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.task-item {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.task-item.completed {
-  background: #f0f0f0;
-  opacity: 0.7;
-  text-decoration: line-through;
-}
-
-.task-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.task-left {
-  margin-right: 16px;
-}
-
-.task-content {
-  flex: 1;
-}
-
-.task-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0 0 4px 0;
-}
-
-.task-item.completed .task-title {
-  color: #666;
-}
-
-.task-description {
-  font-size: 14px;
-  color: #666;
-  margin: 0;
-}
-
-.task-actions {
-  margin-left: 16px;
-  display: flex;
-  gap: 4px;
-}
-
-.add-item-section {
-  text-align: center;
-  padding-top: 1rem;
-  border-top: 1px solid #e0e0e0;
-  margin-top: 1rem;
-}
-
-.action-buttons-row {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.add-item-button,
-.action-button {
-  font-size: 1.1rem;
-  font-weight: 600;
-  padding: 12px 32px;
-  text-transform: none;
-  letter-spacing: 1px;
-  min-width: 160px;
-}
-
-@media (max-width: 600px) {
-  .action-buttons-row {
-    flex-direction: column;
-    width: 100%;
-  }
-  
-  .add-item-button,
-  .action-button {
-    width: 100%;
-    max-width: 300px;
-  }
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
-}
-
-.empty-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0 0 0.5rem 0;
-}
-
-.empty-description {
-  font-size: 1rem;
-  color: #666;
-  margin: 0 0 2rem 0;
-}
-
-/* Responsive Design */
-@media (max-width: 600px) {
-  .app-title {
-    font-size: 2rem;
-  }
-
-  .app-subtitle {
-    font-size: 0.9rem;
-  }
-
-  .task-item {
-    padding: 12px;
-  }
-
-  .task-title {
-    font-size: 14px;
-  }
-
-  .task-description {
-    font-size: 12px;
-  }
-}
+.routine-page{max-width:1160px;padding:26px 28px 80px}.back-link{margin-left:-12px;margin-bottom:18px}.routine-header{display:flex;justify-content:space-between;align-items:end;gap:24px}.routine-header h1{font-size:clamp(2.4rem,5vw,4.7rem);line-height:.95;letter-spacing:-.055em;margin:0 0 12px;color:#173d3a}.routine-header p{color:#687572;max-width:620px}.kicker{font:700 11px ui-monospace,monospace;letter-spacing:.14em;color:#245b55;margin-bottom:9px}.readiness{--progress:0%;width:104px;height:104px;flex:0 0 auto;border-radius:50%;background:conic-gradient(#4f897e var(--progress),#dce9e5 0);display:grid;place-content:center;text-align:center;position:relative}.readiness:after{content:'';position:absolute;inset:9px;border-radius:50%;background:#f8faf9}.readiness strong,.readiness span{z-index:1}.readiness strong{font-size:1.45rem;color:#173d3a}.readiness span{font-size:.68rem;color:#687572}.next-card{margin:30px 0 22px;background:#173d3a;color:#fff;border-radius:24px;padding:28px 30px;display:flex;justify-content:space-between;align-items:center;gap:22px}.next-card h2{font-size:2rem;line-height:1.05;margin:0 0 8px}.next-card p{color:#b8c9c3;margin:0}.next-card .kicker{color:#a9d7c3}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:22px 0 14px}.filter-row{display:flex;gap:8px;overflow:auto;padding:2px}.routine-list{display:grid;gap:9px}.routine-row{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;background:#fff;border:1px solid #dce3df;border-radius:15px;padding:10px 12px}.routine-row.done{opacity:.58}.routine-row.done strong{text-decoration:line-through}.task-copy{appearance:none;border:0;background:transparent;text-align:left;display:flex;flex-direction:column;min-width:0;padding:5px 8px;cursor:pointer;color:#173d3a}.task-copy strong{font-size:.95rem}.task-copy span{font-size:.78rem;color:#687572;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.task-copy small{font-size:.68rem;color:#78908a;margin-top:5px}.loading-state,.empty-state{min-height:280px;display:grid;place-content:center;justify-items:center;text-align:center;gap:12px}.empty-state p{color:#687572}.guide-card{border-radius:20px!important}.guide-card .v-card-title{display:flex;align-items:center;padding:20px 22px}.form-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.guide-heading{display:flex;justify-content:space-between;align-items:center;gap:18px;margin:4px 0 14px}.guide-heading p{font-size:.75rem;color:#687572;margin:3px 0 0}.step-edit{display:grid;grid-template-columns:30px 1fr 42px;gap:9px;align-items:center;margin-bottom:9px}.step-edit>span{width:28px;height:28px;border-radius:8px;background:#173d3a;color:#fff;display:grid;place-items:center;font:700 .7rem ui-monospace,monospace}@media(max-width:720px){.routine-page{padding:20px 14px 78px}.routine-header{align-items:flex-start}.readiness{width:82px;height:82px}.next-card{align-items:flex-start;flex-direction:column}.next-card .v-btn,.toolbar>.v-btn{width:100%}.toolbar{align-items:stretch;flex-direction:column}.form-grid{grid-template-columns:1fr}.routine-row{grid-template-columns:40px 1fr 40px}}
 </style>

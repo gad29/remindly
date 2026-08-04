@@ -20,6 +20,8 @@ export interface List {
   position: number
   createdAt: Date
   updatedAt: Date
+  taskCount?: number
+  completedCount?: number
 }
 
 // Task Types
@@ -218,9 +220,11 @@ export interface CreateTaskForm {
   title: string
   description?: string
   listId: string
-  priority: 'low' | 'medium' | 'high' | 'urgent'
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
   dueDate?: string
   dueTime?: string
+  completed?: boolean
+  metadata?: Record<string, any>
 }
 
 export interface CreateShoppingItemForm {

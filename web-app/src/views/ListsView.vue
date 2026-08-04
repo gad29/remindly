@@ -1,287 +1,70 @@
 <template>
-  <div class="lists-view">
-    <!-- Header Section -->
-    <div class="header-section">
-      <div class="header-content">
-        <v-icon class="mr-2 header-icon">mdi-format-list-bulleted</v-icon>
-        <h1 class="app-title">LISTS</h1>
-        <p class="app-subtitle">Organize Your Tasks</p>
+  <v-container class="routine-library" fluid>
+    <header class="library-header">
+      <div>
+        <div class="kicker">REMINDLY LISTS</div>
+        <h1>Your routine library</h1>
+        <p>Turn any list into a calm, guided checklist. Open one to work through it step by step.</p>
       </div>
+      <v-btn color="primary" size="large" prepend-icon="mdi-plus" @click="router.push('/lists/new')">New list</v-btn>
+    </header>
+
+    <section class="summary-strip" aria-label="List summary">
+      <article><v-icon icon="mdi-format-list-checks"/><div><strong>{{ lists.length }}</strong><span>Lists</span></div></article>
+      <article><v-icon icon="mdi-checkbox-blank-circle-outline"/><div><strong>{{ pendingTotal }}</strong><span>Still to do</span></div></article>
+      <article><v-icon icon="mdi-check-circle-outline"/><div><strong>{{ completedTotal }}</strong><span>Completed</span></div></article>
+    </section>
+
+    <v-alert v-if="listStore.error" type="error" variant="tonal" class="mb-5">{{ listStore.error }}</v-alert>
+    <div v-if="loading" class="loading-state"><v-progress-circular indeterminate color="primary"/><span>Loading your lists…</span></div>
+
+    <div v-else-if="lists.length" class="list-grid">
+      <article v-for="list in lists" :key="list.id" class="routine-card" @click="openList(list)" @keydown.enter="openList(list)" tabindex="0">
+        <div class="card-top">
+          <span class="list-icon" :style="{ background: `${list.color}18`, color: list.color }"><v-icon :icon="list.icon || 'mdi-format-list-checks'"/></span>
+          <v-menu>
+            <template #activator="{ props }"><v-btn v-bind="props" icon="mdi-dots-horizontal" variant="text" aria-label="List actions" @click.stop/></template>
+            <v-list density="compact"><v-list-item prepend-icon="mdi-delete-outline" title="Delete list" @click="deleteList(list)"/></v-list>
+          </v-menu>
+        </div>
+        <h2>{{ list.name }}</h2>
+        <p>{{ list.description || 'A flexible routine ready for your next step.' }}</p>
+        <div class="progress-copy"><span>{{ list.completedCount || 0 }} of {{ list.taskCount || 0 }} complete</span><strong>{{ progress(list) }}%</strong></div>
+        <v-progress-linear :model-value="progress(list)" height="7" rounded color="primary" bg-color="#dce8e4"/>
+        <div class="card-foot"><span>{{ nextLabel(list) }}</span><v-icon icon="mdi-arrow-right"/></div>
+      </article>
     </div>
 
-    <!-- Main Content -->
-    <v-container fluid class="pa-4">
-      <v-row>
-        <v-col cols="12">
-          <v-card class="lists-card" elevation="4">
-            <v-card-text class="pa-6">
-              <!-- Add New List Button -->
-              <div class="add-list-section mb-6">
-                <v-btn
-                  color="primary"
-                  size="large"
-                  @click="createList"
-                  class="add-list-button"
-                >
-                  <v-icon start>mdi-plus</v-icon>
-                  Create New List
-                </v-btn>
-              </div>
-              <!-- Loading State -->
-              <div v-if="loading" class="text-center pa-8">
-                <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
-                <p class="mt-4">Loading lists...</p>
-              </div>
-
-              <!-- Lists Grid -->
-              <div v-else-if="lists.length > 0" class="lists-grid">
-                <v-card
-                  v-for="list in lists"
-                  :key="list.id"
-                  class="list-item"
-                  elevation="2"
-                >
-                  <v-card-text class="pa-4">
-                    <div class="list-header">
-                      <v-icon :color="list.color" size="32" class="mr-3">{{ list.icon }}</v-icon>
-                      <div class="list-info" @click="openList(list)">
-                        <h3 class="list-title">{{ list.name }}</h3>
-                        <p class="list-description">{{ list.description || 'No description' }}</p>
-                      </div>
-                      <v-btn
-                        icon
-                        variant="text"
-                        size="small"
-                        color="error"
-                        @click.stop="deleteList(list)"
-                        class="delete-button"
-                      >
-                        <v-icon>mdi-delete</v-icon>
-                      </v-btn>
-                    </div>
-                    <div class="list-stats" @click="openList(list)">
-                      <span class="task-count">{{ list.taskCount || 0 }} tasks</span>
-                      <span class="list-date">{{ formatDate(list.updatedAt) }}</span>
-                    </div>
-                  </v-card-text>
-                </v-card>
-              </div>
-
-              <!-- Empty State -->
-              <div v-else-if="!loading" class="empty-state">
-                <v-icon size="80" color="grey" class="mb-4">mdi-format-list-bulleted</v-icon>
-                <h3 class="empty-title">No Lists Yet</h3>
-                <p class="empty-description">Create your first list to get started organizing your tasks</p>
-                <v-btn
-                  color="primary"
-                  size="large"
-                  @click="createList"
-                  class="mt-4"
-                >
-                  <v-icon start>mdi-plus</v-icon>
-                  Create Your First List
-                </v-btn>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-    </v-container>
-  </div>
+    <section v-else class="empty-state">
+      <span class="empty-icon"><v-icon icon="mdi-format-list-checks" size="38"/></span>
+      <h2>Build your first routine</h2>
+      <p>Create a list for anything you want to finish carefully, one clear step at a time.</p>
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="router.push('/lists/new')">Create a list</v-btn>
+    </section>
+  </v-container>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useListStore } from '@/stores/listStore'
+import type { List } from '@/types'
 
 const router = useRouter()
-const { t } = useI18n()
 const listStore = useListStore()
-
 const lists = computed(() => listStore.lists)
 const loading = computed(() => listStore.loading)
-
-const createList = () => {
-  router.push('/lists/new')
+const completedTotal = computed(() => lists.value.reduce((sum, list) => sum + (list.completedCount || 0), 0))
+const pendingTotal = computed(() => lists.value.reduce((sum, list) => sum + Math.max(0, (list.taskCount || 0) - (list.completedCount || 0)), 0))
+const progress = (list: List) => list.taskCount ? Math.round(((list.completedCount || 0) / list.taskCount) * 100) : 0
+const nextLabel = (list: List) => list.taskCount ? (progress(list) === 100 ? 'Routine complete' : 'Continue routine') : 'Add the first task'
+const openList = (list: List) => router.push(`/lists/${list.id}`)
+const deleteList = async (list: List) => {
+  if (confirm(`Delete “${list.name}” and all of its tasks?`)) await listStore.deleteList(list.id)
 }
-
-const openList = (list: any) => {
-  router.push(`/lists/${list.id}`)
-}
-
-const deleteList = async (list: any) => {
-  if (!confirm(`Are you sure you want to delete "${list.name}"? This will also delete all tasks in this list.`)) {
-    return
-  }
-  
-  const result = await listStore.deleteList(list.id)
-  if (result.success) {
-    // List is already removed from store by deleteList
-  } else {
-    alert(result.error || 'Failed to delete list')
-  }
-}
-
-const formatDate = (date: string | Date) => {
-  if (!date) return ''
-  const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleDateString()
-}
-
-onMounted(async () => {
-  await listStore.loadLists()
-})
+onMounted(() => listStore.loadLists())
 </script>
 
 <style scoped>
-.lists-view {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  padding: 0;
-}
-
-.header-section {
-  background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #DDA0DD 100%);
-  padding: 2rem 1rem;
-  text-align: center;
-}
-
-.header-content {
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-.header-icon {
-  color: white;
-  font-size: 2rem;
-}
-
-.app-title {
-  font-size: 3rem;
-  font-weight: 900;
-  color: #2c3e50;
-  margin: 0;
-  letter-spacing: 3px;
-  text-align: center;
-}
-
-.app-subtitle {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0;
-  letter-spacing: 2px;
-  text-align: center;
-}
-
-.lists-card {
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.add-list-section {
-  text-align: center;
-}
-
-.add-list-button {
-  font-size: 1.1rem;
-  font-weight: 600;
-  padding: 12px 32px;
-  text-transform: none;
-  letter-spacing: 1px;
-}
-
-.lists-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
-}
-
-.list-item {
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 12px;
-}
-
-.list-item:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-}
-
-.list-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 1rem;
-  position: relative;
-}
-
-.list-info {
-  flex: 1;
-  cursor: pointer;
-}
-
-.delete-button {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-
-.list-title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0 0 0.25rem 0;
-}
-
-.list-description {
-  font-size: 0.9rem;
-  color: #666;
-  margin: 0;
-}
-
-.list-stats {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.8rem;
-  color: #999;
-  cursor: pointer;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
-}
-
-.empty-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0 0 0.5rem 0;
-}
-
-.empty-description {
-  font-size: 1rem;
-  color: #666;
-  margin: 0 0 2rem 0;
-}
-
-/* Responsive Design */
-@media (max-width: 600px) {
-  .app-title {
-    font-size: 2rem;
-  }
-
-  .app-subtitle {
-    font-size: 1rem;
-  }
-
-  .lists-grid {
-    grid-template-columns: 1fr;
-  }
-}
+.routine-library{max-width:1180px;padding:42px 28px 80px}.library-header{display:flex;justify-content:space-between;align-items:end;gap:28px;margin-bottom:30px}.library-header h1{font-size:clamp(2.4rem,5vw,4.5rem);line-height:.96;letter-spacing:-.055em;margin:0 0 14px;color:#173d3a}.library-header p{max-width:620px;color:#687572;margin:0}.kicker{font:700 11px ui-monospace,monospace;letter-spacing:.14em;color:#245b55;margin-bottom:10px}.summary-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}.summary-strip article{display:flex;align-items:center;gap:13px;padding:17px 18px;border:1px solid #dce3df;border-radius:16px;background:#fff}.summary-strip .v-icon{color:#245b55}.summary-strip div{display:flex;flex-direction:column}.summary-strip strong{font-size:1.35rem;color:#173d3a}.summary-strip span{font-size:.75rem;color:#687572}.list-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}.routine-card{background:#fff;border:1px solid #dce3df;border-radius:20px;padding:20px;cursor:pointer;transition:border-color .2s ease,box-shadow .2s ease;outline:none}.routine-card:hover,.routine-card:focus-visible{border-color:#7fa8a0;box-shadow:0 12px 30px rgba(23,61,58,.09)}.card-top,.progress-copy,.card-foot{display:flex;align-items:center;justify-content:space-between}.list-icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center}.routine-card h2{font-size:1.25rem;color:#173d3a;margin:20px 0 7px}.routine-card p{color:#687572;min-height:42px;font-size:.88rem}.progress-copy{font-size:.72rem;color:#687572;margin:20px 0 8px}.progress-copy strong{color:#245b55}.card-foot{border-top:1px solid #edf1ef;margin-top:18px;padding-top:15px;font-size:.78rem;font-weight:700;color:#245b55}.loading-state,.empty-state{min-height:320px;display:grid;place-content:center;justify-items:center;text-align:center;gap:14px}.empty-state p{max-width:420px;color:#687572}.empty-icon{width:70px;height:70px;border-radius:22px;background:#dceee6;color:#245b55;display:grid;place-items:center}@media(max-width:700px){.routine-library{padding:26px 14px 78px}.library-header{align-items:flex-start;flex-direction:column}.library-header .v-btn{width:100%}.summary-strip{grid-template-columns:1fr}.list-grid{grid-template-columns:1fr}}
 </style>
