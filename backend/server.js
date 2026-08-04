@@ -165,31 +165,33 @@ app.use(errorHandler);
 import sequelize from "./config/database.js";
 // Note: associations.js is already imported at the top of the file
 
-const prepareDatabase = process.env.DB_SYNC_ALTER === "true"
-  ? sequelize.sync({ alter: true })
-  : sequelize.authenticate();
+if (process.env.NODE_ENV !== "test") {
+  const prepareDatabase = process.env.DB_SYNC_ALTER === "true"
+    ? sequelize.sync({ alter: true })
+    : sequelize.authenticate();
 
-prepareDatabase
-  .then(() => {
-    app.listen(PORT, () => {
-      logger.info(`🚀 Server running on port ${PORT}`);
-      logger.info(`📱 Environment: ${process.env.NODE_ENV || "development"}`);
-      logger.info(`🔗 API URL: http://localhost:${PORT}/api`);
-      logger.info(`❤️  Health check: http://localhost:${PORT}/health`);
-      logger.info(process.env.DB_SYNC_ALTER === "true" ? "Database synchronized" : "Database connection verified");
+  prepareDatabase
+    .then(() => {
+      app.listen(PORT, () => {
+        logger.info(`🚀 Server running on port ${PORT}`);
+        logger.info(`📱 Environment: ${process.env.NODE_ENV || "development"}`);
+        logger.info(`🔗 API URL: http://localhost:${PORT}/api`);
+        logger.info(`❤️  Health check: http://localhost:${PORT}/health`);
+        logger.info(process.env.DB_SYNC_ALTER === "true" ? "Database synchronized" : "Database connection verified");
+      });
+    })
+    .catch((err) => {
+      logger.error("Failed to synchronize database:", err);
+      logger.error("Error details:", {
+        message: err.message,
+        name: err.name,
+        code: err.code,
+        sql: err.sql
+      });
+      logger.error("The API will not start without its database. PM2 can retry after the database recovers.");
+      process.exitCode = 1;
     });
-  })
-  .catch((err) => {
-    logger.error("Failed to synchronize database:", err);
-    logger.error("Error details:", {
-      message: err.message,
-      name: err.name,
-      code: err.code,
-      sql: err.sql
-    });
-    logger.error("The API will not start without its database. PM2 can retry after the database recovers.");
-    process.exitCode = 1;
-  });
+}
 
 // Graceful shutdown
 process.on("SIGTERM", () => {

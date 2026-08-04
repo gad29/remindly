@@ -42,20 +42,24 @@ const sequelize = new Sequelize({
   },
 });
 
-// Test connection on initialization
-sequelize
-  .authenticate()
-  .then(() => {
-    console.log("✅ PostgreSQL connection established successfully");
-  })
-  .catch((err) => {
-    console.error("❌ PostgreSQL connection failed:", err.message);
-    console.error(
-      "⚠️  Make sure PostgreSQL is running and credentials are correct"
-    );
-    console.error(
-      "⚠️  This application requires PostgreSQL - SQLite is NOT supported"
-    );
-  });
+// Test the connection during normal application startup. Tests own their
+// database lifecycle so Jest can synchronize and close the connection cleanly.
+if (process.env.NODE_ENV !== "test") {
+  sequelize
+    .authenticate()
+    .then(() => {
+      console.log("✅ PostgreSQL connection established successfully");
+    })
+    .catch((err) => {
+      console.error("❌ PostgreSQL connection failed:", err.message);
+      console.error(
+        "⚠️  Make sure PostgreSQL is running and credentials are correct"
+      );
+      console.error(
+        "⚠️  This application requires PostgreSQL - SQLite is NOT supported"
+      );
+    });
+}
 
+export { sequelize };
 export default sequelize;
