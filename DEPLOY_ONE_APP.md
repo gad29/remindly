@@ -26,6 +26,6 @@ Run `npm run build:windows`. The installer is written to `release/`. On first la
 
 ## Android and iOS
 
-The default production domain is `https://vps1remindly.ghsystems.work`. To build for a different installation, set `REMINDLY_APP_URL` before syncing. Then run `npm run mobile:android` or `npm run mobile:ios`. Android builds require Android Studio; iOS builds require Xcode on macOS.
+The default production domain is `https://remindly.ghsystems.work`. To build for a different installation, set `REMINDLY_APP_URL` before syncing. Then run `npm run mobile:android` or `npm run mobile:ios`. Android builds require Android Studio; iOS builds require Xcode on macOS.
 
 The desktop and mobile shells load the same hosted application. The OpenRouter key remains on the VPS and is never packaged into an app.

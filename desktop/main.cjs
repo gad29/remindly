@@ -3,7 +3,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 let mainWindow
-const defaultAppUrl = 'https://vps1remindly.ghsystems.work'
+const defaultAppUrl = 'https://remindly.ghsystems.work'
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json')
 
 function normalizeUrl(value) {

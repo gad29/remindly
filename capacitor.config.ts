@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
-const appUrl = process.env.REMINDLY_APP_URL || 'https://vps1remindly.ghsystems.work'
+const appUrl = process.env.REMINDLY_APP_URL || 'https://remindly.ghsystems.work'
 
 const config: CapacitorConfig = {
   appId: 'app.remindly.mobile',
