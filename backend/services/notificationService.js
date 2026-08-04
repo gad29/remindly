@@ -6,7 +6,10 @@ import { User } from "../models/User.js";
 
 // Initialize services
 let twilioClient = null;
-if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+const hasRealValue = (value) => Boolean(value && !/your_|your |placeholder/i.test(value));
+const twilioConfigured = process.env.TWILIO_ACCOUNT_SID?.startsWith("AC") && hasRealValue(process.env.TWILIO_AUTH_TOKEN);
+
+if (twilioConfigured) {
   try {
     twilioClient = twilio(
       process.env.TWILIO_ACCOUNT_SID,
@@ -17,19 +20,29 @@ if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
   }
 }
 
-if (process.env.SENDGRID_API_KEY) {
+if (process.env.SENDGRID_API_KEY?.startsWith("SG.") && hasRealValue(process.env.SENDGRID_API_KEY)) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
 // Initialize Firebase Admin (if not already initialized)
-if (!admin.apps.length && process.env.FIREBASE_PROJECT_ID) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
+const firebasePrivateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+const firebaseConfigured = hasRealValue(process.env.FIREBASE_PROJECT_ID)
+  && hasRealValue(process.env.FIREBASE_CLIENT_EMAIL)
+  && hasRealValue(firebasePrivateKey)
+  && firebasePrivateKey?.includes("BEGIN PRIVATE KEY");
+
+if (!admin.apps.length && firebaseConfigured) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: firebasePrivateKey,
+      }),
+    });
+  } catch (error) {
+    console.warn("Firebase initialization failed; push notifications are disabled:", error.message);
+  }
 }
 
 class NotificationService {
@@ -38,6 +51,7 @@ class NotificationService {
    */
   async sendPushNotification(userId, title, body, data = {}) {
     try {
+      if (!admin.apps.length) throw new Error("Firebase push notifications are not configured");
       const user = await User.findByPk(userId);
       if (!user || !user.settings?.fcmToken) {
         throw new Error("User FCM token not found");
